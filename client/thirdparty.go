@@ -2,13 +2,14 @@ package client
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 // ThirdPartyClient can be used to access third party resources
 type ThirdPartyClient struct {
 	*restclient.RESTClient
+	baseURL string
 }
 
 func (c *ThirdPartyClient) Workflows(namespace string) WorkflowInterface {
@@ -16,7 +17,7 @@ func (c *ThirdPartyClient) Workflows(namespace string) WorkflowInterface {
 }
 
 // NewThirdparty creates a new ThirdPartyClient
-func NewThirdparty(gv *api_unversioned.GroupVersion, c *restclient.Config) (*ThirdPartyClient, error) {
+func NewThirdparty(gv *k8sApiUnversioned.GroupVersion, c *restclient.Config) (*ThirdPartyClient, error) {
 	config := *c
 	groupVersion := *gv
 	if err := setThirdPartyDefaults(&groupVersion, &config); err != nil {
@@ -26,11 +27,12 @@ func NewThirdparty(gv *api_unversioned.GroupVersion, c *restclient.Config) (*Thi
 	if err != nil {
 		return nil, err
 	}
-	return &ThirdPartyClient{client}, nil
+	baseURL := c.Host + config.APIPath + "/" + config.GroupVersion.Group + "/" + config.GroupVersion.Version
+	return &ThirdPartyClient{client, baseURL}, nil
 }
 
 // Configuration for RESTClient
-func setThirdPartyDefaults(groupVersion *api_unversioned.GroupVersion, config *restclient.Config) error {
+func setThirdPartyDefaults(groupVersion *k8sApiUnversioned.GroupVersion, config *restclient.Config) error {
 	config.APIPath = "/apis"
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()

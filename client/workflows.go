@@ -1,6 +1,10 @@
 package client
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+
 	"github.com/nov1n/kubernetes-workflow/api"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
@@ -41,8 +45,14 @@ func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
 }
 
 func (c *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
+	url := c.r.baseURL + "/namespaces/" + c.ns + "/workflows"
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("could not reach %s: %v", url, err)
+	}
+	dec := json.NewDecoder(resp.Body)
 	result = &api.WorkflowList{}
-	err = nil
+	err = dec.Decode(&result)
 	return
 }
 
