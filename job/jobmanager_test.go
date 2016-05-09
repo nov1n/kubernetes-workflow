@@ -33,7 +33,7 @@ func TestJobCreation(t *testing.T) {
 	}
 
 	// Add job
-	jobManager := &JobManager{
+	jobManager := &Manager{
 		Client:    client,
 		Namespace: NAMESPACE,
 	}

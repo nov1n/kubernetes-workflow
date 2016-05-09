@@ -6,21 +6,21 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-type JobManagerInterface interface {
+type JobManager interface {
 	AddJob() error
 	RemoveJob() error
 }
 
-type JobManager struct {
+type Manager struct {
 	Client    *client.Client
 	Namespace string
 }
 
-func (jm *JobManager) AddJob(jobConfig *batch.Job) (job *batch.Job, err error) {
-	return jm.Client.Extensions().Jobs(jm.Namespace).Create(jobConfig)
+func (man *Manager) AddJob(jobConfig *batch.Job) (job *batch.Job, err error) {
+	return man.Client.Extensions().Jobs(man.Namespace).Create(jobConfig)
 }
 
-func (jm *JobManager) RemoveJob(jobConfig *batch.Job) (err error) {
+func (man *Manager) RemoveJob(jobConfig *batch.Job) (err error) {
 	deleteOptions := &api.DeleteOptions{}
-	return jm.Client.Extensions().Jobs(jm.Namespace).Delete(jobConfig.GetName(), deleteOptions)
+	return man.Client.Extensions().Jobs(man.Namespace).Delete(jobConfig.GetName(), deleteOptions)
 }
