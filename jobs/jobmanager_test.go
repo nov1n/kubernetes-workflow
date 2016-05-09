@@ -16,7 +16,7 @@ const (
 
 func TestJobCreation(t *testing.T) {
 	// Create rest client
-	client, err := workflow.NewRESTClient("127.0.0.1", "8080")
+	client, err := client.NewRESTClient("127.0.0.1", "8080")
 	if err != nil {
 		t.Error("Could not create REST client.")
 	}
