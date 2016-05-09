@@ -1,4 +1,4 @@
-package workflow
+package job
 
 import (
 	"k8s.io/kubernetes/pkg/api"
