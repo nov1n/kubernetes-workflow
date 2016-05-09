@@ -29,7 +29,7 @@ func TestJobCreation(t *testing.T) {
 	}
 	_, err = client.Namespaces().Create(namespace)
 	if err != nil {
-		t.Error(fmt.Sprintf("Could not create namespace '%s':", NAMESPACE, err))
+		t.Error(fmt.Sprintf("Could not create namespace '%s': %s", NAMESPACE, err))
 	}
 
 	// Add job
@@ -80,6 +80,6 @@ func TestJobCreation(t *testing.T) {
 	// Cleanup
 	err = client.Namespaces().Delete(NAMESPACE)
 	if err != nil {
-		t.Error(fmt.Sprintf("Could not delete namespace '%s':", NAMESPACE, err))
+		t.Error(fmt.Sprintf("Could not delete namespace '%s': %s", NAMESPACE, err))
 	}
 }
