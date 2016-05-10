@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nov1n/kubernetes-workflow/client"
+	"github.com/nov1n/kubernetes-workflow/pkg/client"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"

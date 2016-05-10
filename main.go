@@ -5,8 +5,8 @@ import (
 
 	"net"
 
-	"github.com/nov1n/kubernetes-workflow/client"
-	"github.com/nov1n/kubernetes-workflow/job"
+	"github.com/nov1n/kubernetes-workflow/pkg/client"
+	"github.com/nov1n/kubernetes-workflow/pkg/job"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
