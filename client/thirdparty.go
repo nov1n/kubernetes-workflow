@@ -40,6 +40,7 @@ func setThirdPartyDefaults(groupVersion *k8sApiUnversioned.GroupVersion, config 
 
 	config.GroupVersion = groupVersion
 
+	//config.Codec = thirdpartyresourcedata.NewCodec(client.NewExtensions(config).RESTClient.Codec(), gvk.Kind)
 	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
 	config.NegotiatedSerializer = api.Codecs
 

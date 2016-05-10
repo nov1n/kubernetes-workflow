@@ -45,14 +45,13 @@ func main() {
 		return
 	}
 	opts := k8sApi.ListOptions{}
-	list, err := thirdPartyClient.Workflows("default").List(opts)
+	w, err := thirdPartyClient.Workflows("default").Watch(opts)
 	if err != nil {
-		fmt.Println("Couldn't list workflows: ", err)
+		fmt.Println("Couldn't watch workflows: ", err)
 		return
 	}
-	for _, v := range list.Items {
-		for _, step := range v.Spec.Steps {
-			fmt.Println(step.Name)
-		}
+	fmt.Println("Watching..")
+	for res := range w.ResultChan() {
+		fmt.Println(res.Object)
 	}
 }

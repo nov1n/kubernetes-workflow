@@ -31,3 +31,10 @@ type WorkflowList struct {
 
 	Items []Workflow `json:"items"`
 }
+
+func (wf *Workflow) GetObjectKind() k8sApiUnversioned.ObjectKind {
+	return &k8sApiUnversioned.TypeMeta{
+		Kind:       "Workflow",
+		APIVersion: "nerdalize.com/v1alpha1",
+	}
+}
