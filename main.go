@@ -8,7 +8,6 @@ import (
 	"github.com/nov1n/kubernetes-workflow/client"
 	"github.com/nov1n/kubernetes-workflow/job"
 
-	"github.com/nov1n/kubernetes-workflow/client"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -21,14 +20,14 @@ const (
 )
 
 func main() {
-	client, err := client.NewRESTClient("127.0.0.1", "8080")
+	cl, err := client.NewRESTClient("127.0.0.1", "8080")
 
 	if err != nil {
 		panic(err)
 	}
 
 	jobManager := job.Manager{
-		Client:    client,
+		Client:    cl,
 		Namespace: "my-workflows",
 	}
 
