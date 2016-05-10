@@ -25,4 +25,8 @@ script:
     - go vet $(go list ./... | grep -v '/vendor/')
     - go test $(go list ./... | grep -v '/vendor/')
     - godep go build
+    - go test -coverprofile=cover.out ./job
+    - go tool cover -func=cover.out
+    - go test -coverprofile=cover.out ./client
+    - go tool cover -func=cover.out
 
