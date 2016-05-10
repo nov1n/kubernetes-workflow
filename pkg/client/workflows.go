@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nov1n/kubernetes-workflow/api"
-	"github.com/nov1n/kubernetes-workflow/watch"
+	"github.com/nov1n/kubernetes-workflow/pkg/api"
+	"github.com/nov1n/kubernetes-workflow/pkg/watch"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
