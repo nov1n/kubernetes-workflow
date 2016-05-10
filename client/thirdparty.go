@@ -16,18 +16,16 @@ func (c *ThirdPartyClient) Workflows(namespace string) WorkflowInterface {
 	return newWorkflows(c, namespace)
 }
 
-// NewThirdparty creates a new ThirdPartyClient
-func NewThirdparty(gv *k8sApiUnversioned.GroupVersion, c *restclient.Config) (*ThirdPartyClient, error) {
-	config := *c
-	groupVersion := *gv
-	if err := setThirdPartyDefaults(&groupVersion, &config); err != nil {
+// NewThirdParty creates a new ThirdPartyClient
+func NewThirdParty(gv k8sApiUnversioned.GroupVersion, c restclient.Config) (*ThirdPartyClient, error) {
+	if err := setThirdPartyDefaults(&gv, &c); err != nil {
 		return nil, err
 	}
-	client, err := restclient.RESTClientFor(&config)
+	client, err := restclient.RESTClientFor(&c)
 	if err != nil {
 		return nil, err
 	}
-	baseURL := c.Host + config.APIPath + "/" + config.GroupVersion.Group + "/" + config.GroupVersion.Version
+	baseURL := c.Host + c.APIPath + "/" + c.GroupVersion.Group + "/" + c.GroupVersion.Version
 	return &ThirdPartyClient{client, baseURL}, nil
 }
 

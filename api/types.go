@@ -5,7 +5,7 @@ import (
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-// Workflow is a collectin of steps that can have dependencies.
+// Workflow is a collection of steps that can have dependencies.
 type Workflow struct {
 	k8sApiUnversioned.TypeMeta `json:",inline"`
 	k8sApi.ObjectMeta          `json:"metadata,omitempty"`

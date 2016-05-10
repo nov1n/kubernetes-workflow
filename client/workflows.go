@@ -33,22 +33,22 @@ type WorkflowInterface interface {
 
 // workflows implements WorkflowsNamespacer interface
 type workflows struct {
-	r     *ThirdPartyClient
-	ns    string
-	wfMap map[string]api.Workflow
+	client  *ThirdPartyClient
+	ns      string
+	nameMap map[string]api.Workflow
 }
 
 // newPods returns a pods
 func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
 	return &workflows{
-		r:     c,
-		ns:    namespace,
-		wfMap: make(map[string]api.Workflow),
+		client:  c,
+		ns:      namespace,
+		nameMap: make(map[string]api.Workflow),
 	}
 }
 
-func (c *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
-	url := c.r.baseURL + "/namespaces/" + c.ns + "/workflows"
+func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
+	url := w.client.baseURL + "/namespaces/" + w.ns + "/workflows"
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach %s: %v", url, err)
@@ -60,12 +60,12 @@ func (c *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err
 }
 
 // Watch returns a watch.Interface that watches the requested workflows.
-func (c *workflows) Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error) {
+func (w *workflows) Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error) {
 	watcher := watch.NewThirdPartyWatcher()
 	ticker := time.NewTicker(time.Millisecond * 1000)
 	go func() {
 		for range ticker.C {
-			list, err := c.List(opts)
+			list, err := w.List(opts)
 			if err != nil {
 				// TODO: Do logging
 				return
@@ -73,7 +73,7 @@ func (c *workflows) Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error) {
 			listMap := make(map[string]api.Workflow)
 			for _, wf := range list.Items {
 				listMap[wf.Name] = wf
-				if _, ok := c.wfMap[wf.Name]; ok == false {
+				if _, ok := w.nameMap[wf.Name]; ok == false {
 					watcher.Result <- k8sWatch.Event{
 						Type:   k8sWatch.Added,
 						Object: &wf,
@@ -81,15 +81,15 @@ func (c *workflows) Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error) {
 				} else {
 					// TODO: Add changed event
 				}
-				c.wfMap[wf.Name] = wf
+				w.nameMap[wf.Name] = wf
 			}
-			for k, wf := range c.wfMap {
+			for k, wf := range w.nameMap {
 				if _, ok := listMap[k]; ok == false {
 					watcher.Result <- k8sWatch.Event{
 						Type:   k8sWatch.Deleted,
 						Object: &wf,
 					}
-					delete(c.wfMap, k)
+					delete(w.nameMap, k)
 				}
 			}
 		}

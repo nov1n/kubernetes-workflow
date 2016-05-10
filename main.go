@@ -33,10 +33,10 @@ func main() {
 
 	fmt.Print("Created namespace", jobManager.Namespace)
 
-	thirdPartyClient, err := client.NewThirdparty(&k8sApiUnversioned.GroupVersion{
+	thirdPartyClient, err := client.NewThirdParty(k8sApiUnversioned.GroupVersion{
 		Group:   "nerdalize.com",
 		Version: "v1alpha1",
-	}, &restclient.Config{
+	}, restclient.Config{
 		Host: "http://" + net.JoinHostPort(HOST, PORT),
 	})
 	if err != nil {
