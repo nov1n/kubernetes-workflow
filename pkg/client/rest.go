@@ -8,6 +8,7 @@ import (
 )
 
 func NewRESTClient(host, port string) (client *k8sClient.Client, err error) {
+	lkds
 	config := &k8sRestClient.Config{
 		Host: "http://" + net.JoinHostPort(host, port),
 	}
