@@ -1,0 +1,25 @@
+apiVersion: nerdalize.com/v1alpha1
+kind: Workflow
+metadata:
+  name: test-workflow
+spec:
+  steps:                                              # Array of jobs contained in the workflow
+  - name: step-a                                      # Step name
+    jobTemplate:                                      # Job spec, see http://kubernetes.io/docs/user-guide/jobs/
+      containers:
+      - name: pi
+        image: perl
+        command: ["perl", "print bpi(2000)"]
+        restartPolicy: Never
+      - name: nginx
+        image: nginx
+    dependencies:                                     # Array of dependencies for this step
+    - stepName: step-b                                # Step name this step is dependent on
+      status: success                                 # Step status {success, failed, running}
+  - name: step-b
+    jobTemplate:
+      containers:
+      - name: git-monitor
+        image: kubernetes/git-monitor
+      - name: logger
+        image: google/glog

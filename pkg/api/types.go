@@ -3,6 +3,7 @@ package api
 import (
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 )
 
 // Workflow is a collection of steps that can have dependencies.
@@ -20,8 +21,14 @@ type WorkflowSpec struct {
 
 // WorkflowStep is a step in a Workflow.
 type WorkflowStep struct {
-	Name      string `json:"name"`
-	DependsOn string `json:"dependsOn"`
+	Name         string        `json:"name"`
+	JobTemplate  batch.JobSpec `json:"jobTemplate"`
+	Dependencies []Dependency  `json:"dependencies"`
+}
+
+type Dependency struct {
+	StepName string `json:"stepName"`
+	Status   string `json:"status"`
 }
 
 // WorkflowList is a list of Workflows.
