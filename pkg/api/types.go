@@ -1,9 +1,9 @@
-package types
+package api
 
 import (
-	"k8s.io/kubernetes/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/api"
+	k8sApi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/batch"
 )
 
 // Workflow implements
@@ -11,7 +11,7 @@ type Workflow struct {
 	unversioned.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ObjectMeta `json:"metadata,omitempty"`
+	k8sApi.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec represents the desired behaviour of the Workflow.
 	Spec WorkflowSpec `json:"spec,omitempty"`
@@ -35,7 +35,7 @@ type WorkflowList struct {
 type WorkflowSpec struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	api.ObjectMeta `json:"metadata,omitempty"`
+	k8sApi.ObjectMeta `json:"metadata,omitempty"`
 
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
@@ -53,7 +53,7 @@ type WorkflowStep struct {
 
 	// ExternalRef contains a reference to another schedulable resource.
 	// Only one between ExternalRef and JobTemplate can be set.
-	ExternalRef *api.ObjectReference `json:"externalRef,omitempty"`
+	ExternalRef *k8sApi.ObjectReference `json:"externalRef,omitempty"`
 
 	// Dependecies represent dependecies of the current workflow step
 	Dependencies []string `json:"dependencies,omitempty"`
@@ -73,7 +73,7 @@ type WorkflowCondition struct {
 	// Type of workflow condition
 	Type WorkflowConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
-	Status api.ConditionStatus `json:"status"`
+	Status k8sApi.ConditionStatus `json:"status"`
 	// Last time the condition was checked.
 	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
 	// Last time the condition transited from one status to another.
@@ -108,5 +108,12 @@ type WorkflowStepStatus struct {
 	// Complete reports the completion of status
 	Complete bool `json:"complete"`
 	// Reference contains a reference to the WorkflowStep
-	Reference api.ObjectReference `json:"reference"`
+	Reference k8sApi.ObjectReference `json:"reference"`
+}
+
+func (wf *Workflow) GetObjectKind() unversioned.ObjectKind {
+	return &unversioned.TypeMeta{
+		Kind:       "Workflow",
+		APIVersion: "nerdalize.com/v1alpha1",
+	}
 }
