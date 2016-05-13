@@ -67,6 +67,19 @@ func DeepCopy_conversion_Converter(in Converter, out *Converter, c *Cloner) erro
 	if err := DeepCopy_conversion_ConversionFuncs(in.generatedConversionFuncs, &out.generatedConversionFuncs, c); err != nil {
 		return err
 	}
+	if in.genericConversions != nil {
+		in, out := in.genericConversions, &out.genericConversions
+		*out = make([]GenericConversionFunc, len(in))
+		for i := range in {
+			if newVal, err := c.DeepCopy(in[i]); err != nil {
+				return err
+			} else {
+				(*out)[i] = newVal.(GenericConversionFunc)
+			}
+		}
+	} else {
+		out.genericConversions = nil
+	}
 	if in.ignoredConversions != nil {
 		in, out := in.ignoredConversions, &out.ignoredConversions
 		*out = make(map[typePair]struct{})
@@ -161,8 +174,6 @@ func DeepCopy_conversion_Equalities(in Equalities, out *Equalities, c *Cloner) e
 }
 
 func DeepCopy_conversion_Meta(in Meta, out *Meta, c *Cloner) error {
-	out.SrcVersion = in.SrcVersion
-	out.DestVersion = in.DestVersion
 	if in.KeyNameMapping == nil {
 		out.KeyNameMapping = nil
 	} else if newVal, err := c.DeepCopy(in.KeyNameMapping); err != nil {
