@@ -50,6 +50,7 @@ type WorkflowManager struct {
 
 	// Store of job
 	jobStore k8sCache.StoreToJobLister
+
 	// Watches changes to all jobs
 	jobController *framework.Controller
 
