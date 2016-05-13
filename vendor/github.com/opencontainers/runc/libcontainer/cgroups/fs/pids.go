@@ -4,7 +4,6 @@ package fs
 
 import (
 	"fmt"
-	"path/filepath"
 	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -48,26 +47,11 @@ func (s *PidsGroup) Remove(d *cgroupData) error {
 }
 
 func (s *PidsGroup) GetStats(path string, stats *cgroups.Stats) error {
-	current, err := getCgroupParamUint(path, "pids.current")
+	value, err := getCgroupParamUint(path, "pids.current")
 	if err != nil {
 		return fmt.Errorf("failed to parse pids.current - %s", err)
 	}
 
-	maxString, err := getCgroupParamString(path, "pids.max")
-	if err != nil {
-		return fmt.Errorf("failed to parse pids.max - %s", err)
-	}
-
-	// Default if pids.max == "max" is 0 -- which represents "no limit".
-	var max uint64
-	if maxString != "max" {
-		max, err = parseUint(maxString, 10, 64)
-		if err != nil {
-			return fmt.Errorf("failed to parse pids.max - unable to parse %q as a uint from Cgroup file %q", maxString, filepath.Join(path, "pids.max"))
-		}
-	}
-
-	stats.PidsStats.Current = current
-	stats.PidsStats.Limit = max
+	stats.PidsStats.Current = value
 	return nil
 }

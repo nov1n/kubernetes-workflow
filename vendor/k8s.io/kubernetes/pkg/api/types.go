@@ -138,6 +138,16 @@ type ObjectMeta struct {
 	// objects.  Annotation keys have the same formatting restrictions as Label keys. See the
 	// comments on Labels for details.
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// List of objects depended by this object. If ALL objects in the list have
+	// been deleted, this object will be garbage collected.
+	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty"`
+
+	// Must be empty before the object is deleted from the registry. Each entry
+	// is an identifier for the responsible component that will remove the entry
+	// from the list. If the deletionTimestamp of the object is non-nil, entries
+	// in this list can only be removed.
+	Finalizers []string `json:"finalizers,omitempty"`
 }
 
 const (
@@ -748,6 +758,9 @@ type VolumeMount struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// Required. Must not contain ':'.
 	MountPath string `json:"mountPath"`
+	// Path within the volume from which the container's volume should be mounted.
+	// Defaults to "" (volume's root).
+	SubPath string `json:"subPath,omitempty"`
 }
 
 // EnvVar represents an environment variable present in a Container.
@@ -1058,6 +1071,8 @@ type PodConditionType string
 
 // These are valid conditions of pod.
 const (
+	// PodScheduled represents status of the scheduling process for this pod.
+	PodScheduled PodConditionType = "PodScheduled"
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
 	PodReady PodConditionType = "Ready"
@@ -1149,11 +1164,109 @@ const (
 	NodeSelectorOpLt           NodeSelectorOperator = "Lt"
 )
 
-// Affinity is a group of affinity scheduling rules, currently
-// only node affinity, but in the future also inter-pod affinity.
+// Affinity is a group of affinity scheduling rules.
 type Affinity struct {
 	// Describes node affinity scheduling rules for the pod.
 	NodeAffinity *NodeAffinity `json:"nodeAffinity,omitempty"`
+	// Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)).
+	PodAffinity *PodAffinity `json:"podAffinity,omitempty"`
+	// Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).
+	PodAntiAffinity *PodAntiAffinity `json:"podAntiAffinity,omitempty"`
+}
+
+// Pod affinity is a group of inter pod affinity scheduling rules.
+type PodAffinity struct {
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
+	// If the affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system will try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// If the affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system may or may not try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	RequiredDuringSchedulingIgnoredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
+	// The scheduler will prefer to schedule pods to nodes that satisfy
+	// the affinity expressions specified by this field, but it may choose
+	// a node that violates one or more of the expressions. The node that is
+	// most preferred is the one with the greatest sum of weights, i.e.
+	// for each node that meets all of the scheduling requirements (resource
+	// request, requiredDuringScheduling affinity expressions, etc.),
+	// compute a sum by iterating through the elements of this field and adding
+	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+	// node(s) with the highest sum are the most preferred.
+	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
+}
+
+// Pod anti affinity is a group of inter pod anti affinity scheduling rules.
+type PodAntiAffinity struct {
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
+	// If the anti-affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the anti-affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system will try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	// RequiredDuringSchedulingRequiredDuringExecution []PodAffinityTerm  `json:"requiredDuringSchedulingRequiredDuringExecution,omitempty"`
+	// If the anti-affinity requirements specified by this field are not met at
+	// scheduling time, the pod will not be scheduled onto the node.
+	// If the anti-affinity requirements specified by this field cease to be met
+	// at some point during pod execution (e.g. due to a pod label update), the
+	// system may or may not try to eventually evict the pod from its node.
+	// When there are multiple elements, the lists of nodes corresponding to each
+	// podAffinityTerm are intersected, i.e. all terms must be satisfied.
+	RequiredDuringSchedulingIgnoredDuringExecution []PodAffinityTerm `json:"requiredDuringSchedulingIgnoredDuringExecution,omitempty"`
+	// The scheduler will prefer to schedule pods to nodes that satisfy
+	// the anti-affinity expressions specified by this field, but it may choose
+	// a node that violates one or more of the expressions. The node that is
+	// most preferred is the one with the greatest sum of weights, i.e.
+	// for each node that meets all of the scheduling requirements (resource
+	// request, requiredDuringScheduling anti-affinity expressions, etc.),
+	// compute a sum by iterating through the elements of this field and adding
+	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+	// node(s) with the highest sum are the most preferred.
+	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm `json:"preferredDuringSchedulingIgnoredDuringExecution,omitempty"`
+}
+
+// The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
+type WeightedPodAffinityTerm struct {
+	// weight associated with matching the corresponding podAffinityTerm,
+	// in the range 1-100.
+	Weight int `json:"weight"`
+	// Required. A pod affinity term, associated with the corresponding weight.
+	PodAffinityTerm PodAffinityTerm `json:"podAffinityTerm"`
+}
+
+// Defines a set of pods (namely those matching the labelSelector
+// relative to the given namespace(s)) that this pod should be
+// co-located (affinity) or not co-located (anti-affinity) with,
+// where co-located is defined as running on a node whose value of
+// the label with key <topologyKey> matches that of any node on which
+// a pod of the set of pods is running.
+type PodAffinityTerm struct {
+	// A label query over a set of resources, in this case pods.
+	LabelSelector *unversioned.LabelSelector `json:"labelSelector,omitempty"`
+	// namespaces specifies which namespaces the labelSelector applies to (matches against);
+	// nil list means "this pod's namespace," empty list means "all namespaces"
+	// The json tag here is not "omitempty" since we need to distinguish nil and empty.
+	// See https://golang.org/pkg/encoding/json/#Marshal for more details.
+	Namespaces []string `json:"namespaces"`
+	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
+	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
+	// whose value of the label with key topologyKey matches that of any node on which any of the
+	// selected pods is running.
+	// For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as "all topologies"
+	// ("all topologies" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains);
+	// for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
+	TopologyKey string `json:"topologyKey,omitempty"`
 }
 
 // Node affinity is a group of node affinity scheduling rules.
@@ -1809,6 +1922,11 @@ type NodeResources struct {
 // ResourceName is the name identifying various resources in a ResourceList.
 type ResourceName string
 
+// Resource names must be not more than 63 characters, consisting of upper- or lower-case alphanumeric characters,
+// with the -, _, and . characters allowed anywhere, except the first or last character.
+// The default convention, matching that for annotations, is to use lower-case names, with dashes, rather than
+// camel case, separating compound words.
+// Fully-qualified resource typenames are constructed from a DNS-style subdomain, followed by a slash `/` and a name.
 const (
 	// CPU, in cores. (500m = .5 cores)
 	ResourceCPU ResourceName = "cpu"
@@ -1816,6 +1934,8 @@ const (
 	ResourceMemory ResourceName = "memory"
 	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
 	ResourceStorage ResourceName = "storage"
+	// NVIDIA GPU, in devices. Alpha, might change: although fractional and allowing values >1, only one whole device per node is assigned.
+	ResourceNvidiaGPU ResourceName = "alpha.kubernetes.io/nvidia-gpu"
 	// Number of Pods that may be running on this Node: see ResourcePods
 )
 
@@ -1925,6 +2045,10 @@ type DeleteOptions struct {
 	// Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
 	// returned.
 	Preconditions *Preconditions `json:"preconditions,omitempty"`
+
+	// Should the dependent objects be orphaned. If true/false, the "orphan"
+	// finalizer will be added to/removed from the object's finalizers list.
+	OrphanDependents *bool `json:"orphanDependents,omitempty"`
 }
 
 // ExportOptions is the query options to the standard REST get call.
@@ -2055,6 +2179,23 @@ type ServiceProxyOptions struct {
 	// http://localhost/api/v1/namespaces/kube-system/services/elasticsearch-logging/_search?q=user:kimchy.
 	// Path is _search?q=user:kimchy.
 	Path string
+}
+
+// OwnerReference contains enough information to let you identify an owning
+// object. Currently, an owning object must be in the same namespace, so there
+// is no namespace field.
+type OwnerReference struct {
+	// API version of the referent.
+	APIVersion string `json:"apiVersion"`
+	// Kind of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	Kind string `json:"kind"`
+	// Name of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names
+	Name string `json:"name"`
+	// UID of the referent.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
+	UID types.UID `json:"uid"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
@@ -2573,4 +2714,14 @@ type RangeAllocation struct {
 const (
 	// "default-scheduler" is the name of default scheduler.
 	DefaultSchedulerName = "default-scheduler"
+
+	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// corresponding to every RequiredDuringScheduling affinity rule.
+	// When the --hard-pod-affinity-weight scheduler flag is not specified,
+	// DefaultHardPodAffinityWeight defines the weight of the implicit PreferredDuringScheduling affinity rule.
+	DefaultHardPodAffinitySymmetricWeight int = 1
+
+	// When the --failure-domains scheduler flag is not specified,
+	// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
+	DefaultFailureDomains string = unversioned.LabelHostname + "," + unversioned.LabelZoneFailureDomain + "," + unversioned.LabelZoneRegion
 )
