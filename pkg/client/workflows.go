@@ -48,7 +48,11 @@ func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
 }
 
 func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
-	url := w.client.baseURL + "/namespaces/" + w.ns + "/workflows"
+	nsPath := "/namespaces/" + w.ns
+	if w.ns == "" {
+		nsPath = ""
+	}
+	url := w.client.baseURL + nsPath + "/workflows"
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach %s: %v", url, err)
@@ -56,9 +60,6 @@ func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err
 	dec := json.NewDecoder(resp.Body)
 	result = &api.WorkflowList{}
 	err = dec.Decode(&result)
-	if err != nil {
-		fmt.Println("Error while decoding workflow: ", err)
-	}
 	return
 }
 

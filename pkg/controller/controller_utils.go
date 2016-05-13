@@ -101,7 +101,7 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *batch.JobTempl
 		},
 	}
 
-	if err := k8sApi.Scheme.Convert(template, &job.Spec); err != nil {
+	if err := k8sApi.Scheme.Convert(&template.Spec, &job.Spec); err != nil {
 		return fmt.Errorf("unable to convert job template: %v", err)
 	}
 

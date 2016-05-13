@@ -7,26 +7,37 @@ spec:
   steps:
     step-a:
       jobTemplate:
-        containers:
-          -
-            command:
-              - perl
-              - "print bpi(2000)"
-            image: perl
-            name: pi
-            restartPolicy: Never
-          -
-            image: nginx
-            name: nginx
+        metadata:
+          name: job1
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: pod1
+            spec:
+              restartPolicy: OnFailure
+              containers:
+                - image: ubuntu
+                  name: ubunt1
+                  command:
+                    - /bin/sleep
+                    - 30
     step-b:
       dependencies:
         - step-a
       jobTemplate:
-        containers:
-          -
-            image: google/glog
-            name: logger
-          -
-            image: kubernetes/git-monitor
-            name: git-monitor
-
+        metadata:
+          name: job2
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: pod2
+            spec:
+              restartPolicy: OnFailure
+              containers:
+                - image: ubuntu
+                  name: ubuntu2
+                  command:
+                    - /bin/sleep
+                    - 30
