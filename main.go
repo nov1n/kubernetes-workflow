@@ -39,7 +39,7 @@ func main() {
 		fmt.Println("Couldn't create set client: ", err)
 		return
 	}
-	oldClient := k8sClient.NewOrDie(&clientConfig)
+	oldClient, err := k8sClient.New(&clientConfig)
 	if err != nil {
 		fmt.Println("Couldn't create batch client: ", err)
 		return
