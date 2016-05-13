@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 
 	"net"
@@ -15,16 +16,18 @@ import (
 	k8sController "k8s.io/kubernetes/pkg/controller"
 )
 
-// host and port for kubie api
-const (
-	HOST = "localhost"
-	PORT = "8080"
-)
-
 func main() {
+	// Parse cmdline flags
+	host := flag.String("host", "127.0.0.1", "IP address of kubernetes API server")
+	port := flag.String("port", "8080", "Port of the kubernetes API server")
+
+	flag.Parse()
+
+	// Create client
 	clientConfig := restclient.Config{
-		Host: "http://" + net.JoinHostPort(HOST, PORT),
+		Host: "http://" + net.JoinHostPort(*host, *port),
 	}
+
 	thirdPartyClient, err := client.NewThirdParty(k8sApiUnversioned.GroupVersion{
 		Group:   "nerdalize.com",
 		Version: "v1alpha1",
