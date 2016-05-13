@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -149,7 +150,9 @@ func (w *WorkflowManager) getJobWorkflow(job *batch.Job) *api.Workflow {
 func (w *WorkflowManager) worker() {
 	for {
 		func() {
+			fmt.Println("Worker started")
 			key, quit := w.queue.Get()
+			fmt.Printf("Worker got key from queue: %v\n", key)
 			if quit {
 				return
 			}
@@ -163,6 +166,24 @@ func (w *WorkflowManager) worker() {
 }
 
 func (w *WorkflowManager) syncWorkflow(key string) error {
+	fmt.Println("Syncing: " + key)
+
+	// Check if the jobStore is synced yet (initialized)
+
+	// Obtain the workflow object from store by key
+
+	// If this is the first time syncWorkflow is called and
+	// the statuses map is empty, create it
+
+	// If expectations are not met ???
+
+	// If the workflow is finished we don't have to do anything
+
+	// If the the deadline has passed we add a condition, set completion time and
+	// fire an event
+
+	// Try to schedule suitable steps
+
 	return nil
 }
 
@@ -180,6 +201,12 @@ func isWorkflowFinished(w *api.Workflow) bool {
 }
 
 func (w *WorkflowManager) enqueueController(obj interface{}) {
+	key, err := k8sController.KeyFunc(obj)
+	if err != nil {
+		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return
+	}
+	w.queue.Add(key)
 }
 
 func (w *WorkflowManager) addJob(obj interface{}) {

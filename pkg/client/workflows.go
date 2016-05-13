@@ -56,6 +56,9 @@ func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err
 	dec := json.NewDecoder(resp.Body)
 	result = &api.WorkflowList{}
 	err = dec.Decode(&result)
+	if err != nil {
+		fmt.Println("Error while decoding workflow: ", err)
+	}
 	return
 }
 

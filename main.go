@@ -48,6 +48,8 @@ func main() {
 		return
 	}
 
+	fmt.Println("Clients initialized")
+
 	manager := workflow.NewWorkflowManager(oldClient, client, thirdPartyClient, k8sController.NoResyncPeriodFunc)
 	stopChan := make(chan struct{})
 	manager.Run(5, stopChan)
