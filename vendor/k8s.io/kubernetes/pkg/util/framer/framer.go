@@ -131,13 +131,13 @@ func NewJSONFramedReader(r io.ReadCloser) io.ReadCloser {
 func (r *jsonFrameReader) Read(data []byte) (int, error) {
 	// Return whatever remaining data exists from an in progress frame
 	if n := len(r.remaining); n > 0 {
-		if n <= cap(data) {
+		if n <= len(data) {
 			data = append(data[0:0], r.remaining...)
 			r.remaining = nil
 			return n, nil
 		}
 
-		n = cap(data)
+		n = len(data)
 		data = append(data[0:0], r.remaining[:n]...)
 		r.remaining = r.remaining[n:]
 		return n, io.ErrShortBuffer
@@ -145,6 +145,7 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 
 	// RawMessage#Unmarshal appends to data - we reset the slice down to 0 and will either see
 	// data written to data, or be larger than data and a different array.
+	n := len(data)
 	m := json.RawMessage(data[:0])
 	if err := r.decoder.Decode(&m); err != nil {
 		return 0, err
@@ -153,7 +154,7 @@ func (r *jsonFrameReader) Read(data []byte) (int, error) {
 	// If capacity of data is less than length of the message, decoder will allocate a new slice
 	// and set m to it, which means we need to copy the partial result back into data and preserve
 	// the remaining result for subsequent reads.
-	if n := cap(data); len(m) > n {
+	if len(m) > n {
 		data = append(data[0:0], m[:n]...)
 		r.remaining = m[n:]
 		return n, io.ErrShortBuffer
