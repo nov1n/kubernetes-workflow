@@ -4,12 +4,6 @@ metadata:
   name: test-workflow
 spec:
   activeDeadlineSeconds: 3600
-  labelSelector:
-    matchExpressions:
-      key: security
-      operator: In
-      values:
-        - S1
   steps:
     step-a:
       jobTemplate:
