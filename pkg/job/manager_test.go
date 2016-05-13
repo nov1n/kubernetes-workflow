@@ -2,12 +2,13 @@ package job
 
 import (
 	"fmt"
+	"net"
 	"testing"
 
-	"github.com/nov1n/kubernetes-workflow/pkg/client"
-
-	"k8s.io/kubernetes/pkg/api"
+	k8sApi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	k8sRestClient "k8s.io/kubernetes/pkg/client/restclient"
+	k8sClientUnversioned "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 const (
@@ -16,44 +17,48 @@ const (
 
 func TestJobCreation(t *testing.T) {
 	// Create rest client
-	client, err := client.NewRESTClient("127.0.0.1", "8080")
+	config := &k8sRestClient.Config{
+		Host: "http://" + net.JoinHostPort("127.0.0.1", "8080"),
+	}
+
+	restClient, err := k8sClientUnversioned.New(config)
 	if err != nil {
 		t.Error("Could not create REST client.")
 	}
 
 	// Create namespace
-	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
+	namespace := &k8sApi.Namespace{
+		ObjectMeta: k8sApi.ObjectMeta{
 			Name: NAMESPACE,
 		},
 	}
-	_, err = client.Namespaces().Create(namespace)
+	_, err = restClient.Namespaces().Create(namespace)
 	if err != nil {
 		t.Error(fmt.Sprintf("Could not create namespace '%s': %s", NAMESPACE, err))
 	}
 
 	// Add job
 	jobManager := &Manager{
-		Client:    client,
+		Client:    restClient,
 		Namespace: NAMESPACE,
 	}
 
 	jobConfig := &batch.Job{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: k8sApi.ObjectMeta{
 			Name: "my-job",
 		},
 		Spec: batch.JobSpec{
-			Template: api.PodTemplateSpec{
-				ObjectMeta: api.ObjectMeta{
+			Template: k8sApi.PodTemplateSpec{
+				ObjectMeta: k8sApi.ObjectMeta{
 					Name: "my-job",
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						api.Container{
+				Spec: k8sApi.PodSpec{
+					Containers: []k8sApi.Container{
+						k8sApi.Container{
 							Name:  "nginx",
 							Image: "nginx",
-							Ports: []api.ContainerPort{
-								api.ContainerPort{
+							Ports: []k8sApi.ContainerPort{
+								k8sApi.ContainerPort{
 									ContainerPort: 80,
 								},
 							},
@@ -78,7 +83,7 @@ func TestJobCreation(t *testing.T) {
 	}
 
 	// Cleanup
-	err = client.Namespaces().Delete(NAMESPACE)
+	err = restClient.Namespaces().Delete(NAMESPACE)
 	if err != nil {
 		t.Error(fmt.Sprintf("Could not delete namespace '%s': %s", NAMESPACE, err))
 	}
