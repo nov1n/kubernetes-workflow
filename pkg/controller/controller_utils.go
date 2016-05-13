@@ -10,9 +10,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
+	k8sController "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -26,8 +26,8 @@ type JobControlInterface interface {
 
 // RealJobControl is the default implementation of JobControlInterface
 type WorkflowJobControl struct {
-	Client   k8sClient.Client
-	Recorder record.EventRecorder
+	KubeClient clientset.Interface
+	Recorder   record.EventRecorder
 }
 
 var _ JobControlInterface = &WorkflowJobControl{}
@@ -60,7 +60,7 @@ func getJobsAnnotationSet(template *batch.JobTemplateSpec, object runtime.Object
 	if err != nil {
 		return desiredAnnotations, fmt.Errorf("unable to serialize controller reference: %v", err)
 	}
-	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
+	desiredAnnotations[k8sController.CreatedByAnnotation] = string(createdByRefJson)
 	return desiredAnnotations, nil
 }
 
@@ -93,7 +93,7 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *batch.JobTempl
 		return fmt.Errorf("object does not have ObjectMeta, %v", err)
 	}
 	prefix := getJobsPrefix(meta.Name)
-	job := &extensions.Job{
+	job := &batch.Job{
 		ObjectMeta: k8sApi.ObjectMeta{
 			Labels:       desiredLabels,
 			Annotations:  desiredAnnotations,
@@ -105,7 +105,7 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *batch.JobTempl
 		return fmt.Errorf("unable to convert job template: %v", err)
 	}
 
-	if newJob, err := w.Client.Extensions().Jobs(namespace).Create(job); err != nil {
+	if newJob, err := w.KubeClient.Batch().Jobs(namespace).Create(job); err != nil {
 		w.Recorder.Eventf(object, k8sApi.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create job: %v", err)
 	} else {

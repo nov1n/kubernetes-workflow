@@ -7,14 +7,19 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/client/cache"
+	"github.com/nov1n/kubernetes-workflow/pkg/controller"
 	k8sApi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
+	k8sCache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/controller"
+	k8sController "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
@@ -23,7 +28,7 @@ import (
 type WorkflowManager struct {
 	oldKubeClient k8sClient.Interface
 	kubeClient    clientset.Interface
-	tpClient      client.ThirdPartyClient
+	tpClient      *client.ThirdPartyClient
 
 	jobControl controller.JobControlInterface
 
@@ -36,7 +41,7 @@ type WorkflowManager struct {
 	jobStoreSynced func() bool
 
 	// A TTLCache of job creates/deletes each rc expects to see
-	expectations controller.ControllerExpectationsInterface
+	expectations k8sController.ControllerExpectationsInterface
 
 	// A store of workflow, populated by the frameworkController
 	workflowStore cache.StoreToWorkflowLister
@@ -44,7 +49,7 @@ type WorkflowManager struct {
 	workflowController *framework.Controller
 
 	// Store of job
-	jobStore cache.StoreToJobLister
+	jobStore k8sCache.StoreToJobLister
 	// Watches changes to all jobs
 	jobController *framework.Controller
 
@@ -54,7 +59,7 @@ type WorkflowManager struct {
 	recorder record.EventRecorder
 }
 
-func NewWorkflowManager(oldClient k8sClient.Interface, kubeClient clientset.Interface, tpClient client.ThirdPartyClient, resyncPeriod controller.ResyncPeriodFunc) *WorkflowManager {
+func NewWorkflowManager(oldClient k8sClient.Interface, kubeClient clientset.Interface, tpClient *client.ThirdPartyClient, resyncPeriod k8sController.ResyncPeriodFunc) *WorkflowManager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
@@ -68,19 +73,19 @@ func NewWorkflowManager(oldClient k8sClient.Interface, kubeClient clientset.Inte
 			KubeClient: kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
 		},
-		expectations: controller.NewControllerExpectations(),
+		expectations: k8sController.NewControllerExpectations(),
 		queue:        workqueue.New(),
 		recorder:     eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
 	}
 
 	wc.workflowStore.Store, wc.workflowController = framework.NewInformer(
-		&cache.ListWatch{
+		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (runtime.Object, error) {
 				// @borismattijssen TODO: allow different namespaces
-				return wc.tpClient.Workflows(api.NamespaceAll).List(options)
+				return wc.tpClient.Workflows(k8sApi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options k8sApi.ListOptions) (watch.Interface, error) {
-				return wc.tpClient.Workflows(api.NamespaceAll).Watch(options)
+				return wc.tpClient.Workflows(k8sApi.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Workflow{},
@@ -97,15 +102,15 @@ func NewWorkflowManager(oldClient k8sClient.Interface, kubeClient clientset.Inte
 	)
 
 	wc.jobStore.Store, wc.jobController = framework.NewInformer(
-		&cache.ListWatch{
+		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (runtime.Object, error) {
-				return wc.oldKubeClient.Batch().Jobs(api.NamespaceAll).List(options)
+				return wc.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options k8sApi.ListOptions) (watch.Interface, error) {
-				return wc.oldKubeClient.Batch().Jobs(api.NamespaceAll).Watch(options)
+				return wc.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).Watch(options)
 			},
 		},
-		&extensions.Job{},
+		&batch.Job{},
 		replicationcontroller.FullControllerResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    wc.addJob,
@@ -134,7 +139,7 @@ func (w *WorkflowManager) Run(workers int, stopCh <-chan struct{}) {
 }
 
 // getJobWorkflow return the workflow managing the given job
-func (w *WorkflowManager) getJobWorkflow(job *extensions.Job) *api.Workflow {
+func (w *WorkflowManager) getJobWorkflow(job *batch.Job) *api.Workflow {
 	return nil
 }
 
@@ -187,14 +192,14 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 
 }
 
-func (w *WorkflowManager) manageWorkflow(workflow *extensions.Workflow) bool {
-	return nil
+func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
+	return false
 }
 
-func (w *WorkflowManager) manageWorkflowJob(workflow *extensions.Workflow, stepName string, step *extensions.WorkflowStep) bool {
-	return nil
+func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
+	return false
 }
 
-func (w *WorkflowManager) manageWorkflowReference(workflow *extensions.Workflow, stepName string, step *extensions.WorkflowStep) bool {
-	return nil
+func (w *WorkflowManager) manageWorkflowReference(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
+	return false
 }

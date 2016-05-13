@@ -39,12 +39,15 @@ func main() {
 		fmt.Println("Couldn't create set client: ", err)
 		return
 	}
-	oldClient, err := k8sClient.NewBatch(&clientConfig)
+	oldClient := k8sClient.NewOrDie(&clientConfig)
 	if err != nil {
 		fmt.Println("Couldn't create batch client: ", err)
 		return
 	}
 
 	manager := workflow.NewWorkflowManager(oldClient, client, thirdPartyClient, k8sController.NoResyncPeriodFunc)
-	manager.Run()
+	stopChan := make(chan struct{})
+	manager.Run(5, stopChan)
+	<-stopChan
+	fmt.Println("end")
 }

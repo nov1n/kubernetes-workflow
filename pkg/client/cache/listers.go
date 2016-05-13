@@ -6,7 +6,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	k8sCache "k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -33,7 +33,7 @@ func (s *StoreToWorkflowLister) List() (workflows api.WorkflowList, err error) {
 }
 
 // GetJobWorkflow
-func (s *StoreToWorkflowLister) GetJobWorkflows(job *extensions.Job) (workflows []api.Workflow, err error) {
+func (s *StoreToWorkflowLister) GetJobWorkflows(job *batch.Job) (workflows []api.Workflow, err error) {
 	var selector labels.Selector
 	var workflow api.Workflow
 

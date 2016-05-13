@@ -38,3 +38,9 @@ func (wf *Workflow) GetObjectKind() k8sApiUnversioned.ObjectKind {
 		APIVersion: "nerdalize.com/v1alpha1",
 	}
 }
+func (wf *WorkflowList) GetObjectKind() k8sApiUnversioned.ObjectKind {
+	return &k8sApiUnversioned.TypeMeta{
+		Kind:       "Workflow",
+		APIVersion: "nerdalize.com/v1alpha1",
+	}
+}
