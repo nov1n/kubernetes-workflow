@@ -1,0 +1,32 @@
+apiVersion: nerdalize.com/v1alpha1
+kind: Workflow
+metadata:
+  name: test-workflow
+spec:
+  activeDeadlineSeconds: 3600
+  steps:
+    step-a:
+      jobTemplate:
+        containers:
+          -
+            command:
+              - perl
+              - "print bpi(2000)"
+            image: perl
+            name: pi
+            restartPolicy: Never
+          -
+            image: nginx
+            name: nginx
+    step-b:
+      dependencies:
+        - step-a
+      jobTemplate:
+        containers:
+          -
+            image: google/glog
+            name: logger
+          -
+            image: kubernetes/git-monitor
+            name: git-monitor
+
