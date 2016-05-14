@@ -1,0 +1,7 @@
+metadata:
+  name: workflow.nerdalize.com
+apiVersion: extensions/v1beta1
+kind: ThirdPartyResource
+description: "A specification to create workflow like functionality"
+versions:
+- name: v1alpha1
