@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	k8sRestClient "k8s.io/kubernetes/pkg/client/restclient"
-	k8sClientUnversioned "k8s.io/kubernetes/pkg/client/unversioned"
+	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
+	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
+	k8sClUnv "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
 const (
@@ -17,11 +17,11 @@ const (
 
 func TestJobCreation(t *testing.T) {
 	// Create rest client
-	config := &k8sRestClient.Config{
+	config := &k8sRestCl.Config{
 		Host: "http://" + net.JoinHostPort("127.0.0.1", "8080"),
 	}
 
-	restClient, err := k8sClientUnversioned.New(config)
+	restClient, err := k8sClUnv.New(config)
 	if err != nil {
 		t.Error("Could not create REST client.")
 	}
@@ -43,11 +43,11 @@ func TestJobCreation(t *testing.T) {
 		Namespace: NAMESPACE,
 	}
 
-	jobConfig := &batch.Job{
+	jobConfig := &k8sBatch.Job{
 		ObjectMeta: k8sApi.ObjectMeta{
 			Name: "my-job",
 		},
-		Spec: batch.JobSpec{
+		Spec: k8sBatch.JobSpec{
 			Template: k8sApi.PodTemplateSpec{
 				ObjectMeta: k8sApi.ObjectMeta{
 					Name: "my-job",

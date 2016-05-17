@@ -1,8 +1,10 @@
 package workflow
 
-import "github.com/nov1n/kubernetes-workflow/pkg/client"
-import "github.com/nov1n/kubernetes-workflow/pkg/job"
-import "github.com/nov1n/kubernetes-workflow/pkg/api"
+import (
+	"github.com/nov1n/kubernetes-workflow/pkg/api"
+	"github.com/nov1n/kubernetes-workflow/pkg/client"
+	"github.com/nov1n/kubernetes-workflow/pkg/job"
+)
 
 const (
 	labelKey = "workflow"
