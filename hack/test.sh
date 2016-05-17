@@ -8,6 +8,13 @@ godep go build -o bin/workflow
 
 for file in ./pkg/*
 do
+    CFILE=/tmp/cover.out
     godep go test -coverprofile=/tmp/cover.out $file
-    godep go tool cover -func=/tmp/cover.out
+    if [ -f $CFILE ]
+    then
+        godep go tool cover -func=/tmp/cover.out
+        rm $CFILE
+    else
+        echo "No tests coverage for $file"
+    fi
 done
