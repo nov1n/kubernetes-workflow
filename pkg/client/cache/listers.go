@@ -5,10 +5,10 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/batch"
+	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
+	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 	k8sCache "k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/labels"
+	k8sLabels "k8s.io/kubernetes/pkg/labels"
 )
 
 // StoreToWorkflowLister gives a store List and Exists methods. The store must contain only Workflows.
@@ -33,8 +33,8 @@ func (s *StoreToWorkflowLister) List() (workflows api.WorkflowList, err error) {
 }
 
 // GetJobWorkflow
-func (s *StoreToWorkflowLister) GetJobWorkflows(job *batch.Job) (workflows []api.Workflow, err error) {
-	var selector labels.Selector
+func (s *StoreToWorkflowLister) GetJobWorkflows(job *k8sBatch.Job) (workflows []api.Workflow, err error) {
+	var selector k8sLabels.Selector
 	var workflow api.Workflow
 
 	if len(job.Labels) == 0 {
@@ -47,8 +47,8 @@ func (s *StoreToWorkflowLister) GetJobWorkflows(job *batch.Job) (workflows []api
 		if workflow.Namespace != job.Namespace {
 			continue
 		}
-		selector, _ = unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-		if selector.Matches(labels.Set(job.Labels)) {
+		selector, _ = k8sApiUnv.LabelSelectorAsSelector(job.Spec.Selector)
+		if selector.Matches(k8sLabels.Set(job.Labels)) {
 			workflows = append(workflows, workflow)
 		}
 	}

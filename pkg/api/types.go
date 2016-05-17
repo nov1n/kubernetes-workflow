@@ -2,13 +2,13 @@ package api
 
 import (
 	k8sApi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/batch"
+	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
+	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 )
 
 // Workflow implements
 type Workflow struct {
-	unversioned.TypeMeta `json:",inline"`
+	k8sApiUnv.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	k8sApi.ObjectMeta `json:"metadata,omitempty"`
@@ -22,10 +22,10 @@ type Workflow struct {
 
 // WorkflowList implements list of Workflow.
 type WorkflowList struct {
-	unversioned.TypeMeta `json:",inline"`
+	k8sApiUnv.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
-	unversioned.ListMeta `json:"metadata,omitempty"`
+	k8sApiUnv.ListMeta `json:"metadata,omitempty"`
 
 	// Items is the list of Workflow
 	Items []Workflow `json:"items"`
@@ -42,14 +42,14 @@ type WorkflowSpec struct {
 	Steps map[string]WorkflowStep `json:"steps,omitempty"`
 
 	// Selector for created jobs (if any)
-	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
+	Selector *k8sApiUnv.LabelSelector `json:"selector,omitempty"`
 }
 
 // WorkflowStep contains necessary information to identifiy the node of the workflow graph
 type WorkflowStep struct {
 	// JobTemplate contains the job specificaton that should be run in this Workflow.
 	// Only one between externalRef and jobTemplate can be set.
-	JobTemplate *batch.JobTemplateSpec `json:"jobTemplate,omitempty"`
+	JobTemplate *k8sBatch.JobTemplateSpec `json:"jobTemplate,omitempty"`
 
 	// ExternalRef contains a reference to another schedulable resource.
 	// Only one between ExternalRef and JobTemplate can be set.
@@ -75,9 +75,9 @@ type WorkflowCondition struct {
 	// Status of the condition, one of True, False, Unknown.
 	Status k8sApi.ConditionStatus `json:"status"`
 	// Last time the condition was checked.
-	LastProbeTime unversioned.Time `json:"lastProbeTime,omitempty"`
+	LastProbeTime k8sApiUnv.Time `json:"lastProbeTime,omitempty"`
 	// Last time the condition transited from one status to another.
-	LastTransitionTime unversioned.Time `json:"lastTransitionTime,omitempty"`
+	LastTransitionTime k8sApiUnv.Time `json:"lastTransitionTime,omitempty"`
 	// (brief) reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
 	// Human readable message indicating details about last transition.
@@ -92,12 +92,12 @@ type WorkflowStatus struct {
 	// It is not guaranteed to be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
 	// StartTime doesn't consider startime of `ExternalReference`
-	StartTime *unversioned.Time `json:"startTime,omitempty"`
+	StartTime *k8sApiUnv.Time `json:"startTime,omitempty"`
 
 	// CompletionTime represents time when the workflow was completed. It is not guaranteed to
 	// be set in happens-before order across separate operations.
 	// It is represented in RFC3339 form and is in UTC.
-	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
+	CompletionTime *k8sApiUnv.Time `json:"completionTime,omitempty"`
 
 	// Statuses represent status of different steps
 	Statuses map[string]WorkflowStepStatus `json:"statuses"`
@@ -111,14 +111,14 @@ type WorkflowStepStatus struct {
 	Reference k8sApi.ObjectReference `json:"reference"`
 }
 
-func (wf *Workflow) GetObjectKind() unversioned.ObjectKind {
-	return &unversioned.TypeMeta{
+func (wf *Workflow) GetObjectKind() k8sApiUnv.ObjectKind {
+	return &k8sApiUnv.TypeMeta{
 		Kind:       "Workflow",
 		APIVersion: "nerdalize.com/v1alpha1",
 	}
 }
-func (wf *WorkflowList) GetObjectKind() unversioned.ObjectKind {
-	return &unversioned.TypeMeta{
+func (wf *WorkflowList) GetObjectKind() k8sApiUnv.ObjectKind {
+	return &k8sApiUnv.TypeMeta{
 		Kind:       "Workflow",
 		APIVersion: "nerdalize.com/v1alpha1",
 	}
