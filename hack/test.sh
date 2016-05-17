@@ -4,25 +4,40 @@
 ERROR=""
 
 # Report suspicious constructs
-godep go vet $(go list ./... | grep -v '/vendor/') || ERROR="Error with go vet"
+printf 'GO VET:\n'
+godep go vet $(go list ./... | grep -v '/vendor/' | grep '/nov1n/') || ERROR="Error with go vet"
+
 # Test all packages except vendor
-godep go test $(go list ./... | grep -v '/vendor/') || ERROR="Error testing all packages"
+printf "\n\nGO TEST:\n"
+godep go test $(go list ./... | grep -v '/vendor/' | grep '/nov1n/') || ERROR="Error testing all packages"
 
 [ -d ./bin ] || mkdir bin
 
+#Build main binary
+printf "\n\nBUILDING BINARY:\n"
 godep go build -o bin/workflow || ERROR="Build error"
 
+# Create coverage file
+[ -f ./coverage.out ] && rm ./coverage.out
+touch ./coverage.out
+echo 'mode: count' > ./coverage.out
+
+# Run coverage per package
+printf "\n\nCODE COVERAGE:\n"
+CFILE=/tmp/cover.out
 for pkg in ./pkg/*
 do
-    CFILE=/tmp/cover.out
-    godep go test -coverprofile=/tmp/cover.out $pkg || ERROR="Error testing $pkg"
+    printf "[$pkg]\n"
+    godep go test -covermode=count -coverprofile=/tmp/cover.out $pkg > /dev/null || ERROR="Error testing $pkg"
     if [ -f $CFILE ]
     then
+        tail -n +2 /tmp/cover.out >> ./coverage.out
         godep go tool cover -func=/tmp/cover.out || ERROR="Unable to append coverage for $pkg"
         rm $CFILE
     else
-        echo "No tests coverage for $pkg"
+        echo "No test coverage for $pkg"
     fi
+    printf "\n"
 done
 
 if [ ! -z "$ERROR" ]

@@ -1,25 +1,26 @@
 language: go
 sudo: required
-
 go:
-    - 1.6
-
+- 1.6
 env:
-    - KUBE_VERSION="v1.3.0-alpha.3"
-
+  matrix:
+  - KUBE_VERSION="v1.3.0-alpha.3"
+  global:
+    secure: ckYvO0bYtwXgWYSC0ibb7kJpNCkOggSh8veNF42uNAqJ1hZ+fQOmWxCi+pefTzm+/XeniIWstjoJ5cuK+tioDgUSmO1FKeQtoG0uHgzHNVwv0lPxrU0+JXWpFEmn3mMTlG2KqUc0ok4ID+TMAOHcirGzzh4tZa2CrOP8/E7eG790x6bCL8x8NfajJYKWmbdDU0Dzgd1VuiF0Jb06ch7vMXS0roUQPCYiJ+fa5SsUHzIHqGaS60roNFXctIWiS91JDOESi2LbGw3eOy5fgFESUd1IJ6lysI81CiKgiqNC3Rlxx9x41p4quO60UoGosmIK6FBaevjLqoiMLA5Xz15GO0xHj6w/R0rK4syj6pIzKL/aDxC2gS5Nydft0jfoY6lZKz+mVynHGIxwKLVNbLd5JH/+GpZCCrURi3cBjtYegjGHp0/5nD43keyUCAErakZOD1oZebNzuNxGmf7IgAQNl4HLjkVOfLRqzltHaZJNnHjBJmL2hleowyKzLDUDJMDdmYSDyZOR2AZVWVYpDfbAMzgkrUOuONfmLqSjOwGaPI24Rk1X/B1IoPi6vnmv4GFO2sJ9I5N4jJS4zfz0HQtIZuJCv2BjyRhNM++7LOni/COnp373gA6AIma2uvjCKCF55csYoku3lsXKOV8zES2Pm0UZEjoFhUgFXcteNMovwpU=
 services:
-    - docker
-
+- docker
 before_install:
-    - docker run     --volume=/:/rootfs:ro     --volume=/sys:/sys:ro     --volume=/var/lib/docker/:/var/lib/docker:rw     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw     --volume=/var/run:/var/run:rw     --net=host     --pid=host     --privileged=true     --name=kubelet     -d     gcr.io/google_containers/hyperkube-amd64:${KUBE_VERSION}   /hyperkube kubelet         --containerized         --hostname-override="127.0.0.1"         --address="0.0.0.0"         --api-servers=http://localhost:8080         --config=/etc/kubernetes/manifests         --cluster-dns=10.0.0.10         --cluster-domain=cluster.local         --allow-privileged=true --v=2
-
+- docker run     --volume=/:/rootfs:ro     --volume=/sys:/sys:ro     --volume=/var/lib/docker/:/var/lib/docker:rw     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw     --volume=/var/run:/var/run:rw     --net=host     --pid=host     --privileged=true     --name=kubelet     -d     gcr.io/google_containers/hyperkube-amd64:${KUBE_VERSION}   /hyperkube
+  kubelet         --containerized         --hostname-override="127.0.0.1"         --address="0.0.0.0"         --api-servers=http://localhost:8080         --config=/etc/kubernetes/manifests         --cluster-dns=10.0.0.10         --cluster-domain=cluster.local         --allow-privileged=true
+  --v=2
 install:
-    #Add Godeps dependencies to GOPATH and PATH
-    - export GOPATH="${TRAVIS_BUILD_DIR}/vendor:$GOPATH"
-    - export PATH="${TRAVIS_BUILD_DIR}/vendor/bin:$PATH"
-
+- export GOPATH="${TRAVIS_BUILD_DIR}/vendor:$GOPATH"
+- export PATH="${TRAVIS_BUILD_DIR}/vendor/bin:$PATH"
 before_script:
-    - go get -u github.com/tools/godep
-
+- go get -u github.com/tools/godep
+- go get golang.org/x/tools/cmd/cover
+- go get github.com/pborman/uuid
+- go get github.com/mattn/goveralls
 script:
-    - ./hack/test.sh 
+- ./hack/test.sh
+- goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
