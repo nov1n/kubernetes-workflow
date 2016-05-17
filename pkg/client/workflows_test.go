@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
@@ -30,17 +31,19 @@ const jsonList = `{"kind": "WorkflowList","items": [
             "name": "job1"
           },
           "spec": {
+            "parallelism": 1,
             "template": {
               "metadata": {
                 "name": "pod1"
               },
               "spec": {
+                "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu1",
-                    "name": "ubuntu",
+                    "image": "ubuntu",
+                    "name": "ubuntu1",
                     "command": [
-                      "sleep 10"
+                      "/bin/sleep", "30"
                     ]
                   }
                 ]
@@ -58,17 +61,19 @@ const jsonList = `{"kind": "WorkflowList","items": [
             "name": "job2"
           },
           "spec": {
+            "parallelism": 1,
             "template": {
               "metadata": {
                 "name": "pod2"
               },
               "spec": {
+                "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu2",
-                    "name": "ubuntu",
+                    "image": "ubuntu",
+                    "name": "ubuntu2",
                     "command": [
-                      "sleep 20"
+                      "/bin/sleep", "30"
                     ]
                   }
                 ]
@@ -96,6 +101,7 @@ func getClient(output string) (tpc *ThirdPartyClient, err error) {
 }
 
 func TestList(t *testing.T) {
+	var parallelism int32 = 1
 	expected := api.WorkflowList{
 		TypeMeta: k8sApiUnversioned.TypeMeta{
 			Kind: "WorkflowList",
@@ -118,17 +124,19 @@ func TestList(t *testing.T) {
 									Name: "job1",
 								},
 								Spec: batch.JobSpec{
+									Parallelism: &parallelism,
 									Template: k8sApi.PodTemplateSpec{
 										ObjectMeta: k8sApi.ObjectMeta{
 											Name: "pod1",
 										},
 										Spec: k8sApi.PodSpec{
+											RestartPolicy: "OnFailure",
 											Containers: []k8sApi.Container{
 												k8sApi.Container{
 													Name:  "ubuntu1",
 													Image: "ubuntu",
 													Command: []string{
-														"sleep 10",
+														"/bin/sleep", "30",
 													},
 												},
 											},
@@ -146,17 +154,19 @@ func TestList(t *testing.T) {
 									Name: "job2",
 								},
 								Spec: batch.JobSpec{
+									Parallelism: &parallelism,
 									Template: k8sApi.PodTemplateSpec{
 										ObjectMeta: k8sApi.ObjectMeta{
 											Name: "pod2",
 										},
 										Spec: k8sApi.PodSpec{
+											RestartPolicy: "OnFailure",
 											Containers: []k8sApi.Container{
 												k8sApi.Container{
 													Name:  "ubuntu2",
 													Image: "ubuntu",
 													Command: []string{
-														"sleep 20",
+														"/bin/sleep", "30",
 													},
 												},
 											},
@@ -180,6 +190,6 @@ func TestList(t *testing.T) {
 		t.Errorf("Error while listing workflows: %v", err)
 	}
 	if !reflect.DeepEqual(list, &expected) {
-		// t.Errorf("Returned list doesn't match expected list\nList: %v\nExpected: %v", list, &expected)
+		t.Errorf("Returned list doesn't match expected list. Diff: \n%v\n", pretty.Compare(list, &expected))
 	}
 }
