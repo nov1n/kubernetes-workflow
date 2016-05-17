@@ -10,6 +10,7 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/watch"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -33,13 +34,13 @@ type WorkflowInterface interface {
 
 // workflows implements WorkflowsNamespacer interface
 type workflows struct {
-	client  *ThirdPartyClient
+	client  *dynamic.ResourceClient
 	ns      string
 	nameMap map[string]api.Workflow
 }
 
 // newPods returns a pods
-func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
+func NewWorkflows(c *dynamic.Client, namespace string) *workflows {
 	return &workflows{
 		client:  c,
 		ns:      namespace,

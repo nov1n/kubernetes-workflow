@@ -12,6 +12,7 @@ import (
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
 	k8sController "k8s.io/kubernetes/pkg/controller"
 )
@@ -27,6 +28,14 @@ func main() {
 	clientConfig := restclient.Config{
 		Host: "http://" + net.JoinHostPort(*host, *port),
 	}
+
+	groupVersion := k8sApiUnversioned.GroupVersion{
+		Group:   "nerdalize.com",
+		Version: "v1alpha1",
+	}
+
+	pool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+	pool.ClientForGroupVersion(groupVersion)
 
 	thirdPartyClient, err := client.NewThirdParty(k8sApiUnversioned.GroupVersion{
 		Group:   "nerdalize.com",
