@@ -48,9 +48,9 @@ func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
 }
 
 func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
-	nsPath := "/namespaces/" + w.ns
-	if w.ns == "" {
-		nsPath = ""
+	nsPath := ""
+	if w.ns != "" {
+		nsPath = "/namespaces/" + w.ns
 	}
 	url := w.client.baseURL + nsPath + "/workflows"
 	resp, err := http.Get(url)

@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -153,7 +152,7 @@ func (w *WorkflowManager) worker() {
 	for {
 		func() {
 			key, quit := w.queue.Get()
-			fmt.Printf("Worker got key from queue: %v\n", key)
+			glog.Infof("Worker got key from queue: %v\n", key)
 			if quit {
 				return
 			}
@@ -167,7 +166,7 @@ func (w *WorkflowManager) worker() {
 }
 
 func (w *WorkflowManager) syncWorkflow(key string) error {
-	fmt.Println("Syncing: " + key)
+	glog.Infoln("Syncing: " + key)
 
 	startTime := time.Now()
 	defer func() {
@@ -299,7 +298,7 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	for stepName, step := range workflow.Spec.Steps {
 		err := w.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
 		if err != nil {
-			fmt.Printf("Error creating job: %v\n", err)
+			glog.Errorf("Error creating job: %v\n", err)
 		}
 		// job := &batch.Job{
 		// 	ObjectMeta: k8sApi.ObjectMeta{
