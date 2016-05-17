@@ -37,7 +37,7 @@ type WorkflowSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	k8sApi.ObjectMeta `json:"metadata,omitempty"`
 
-	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
+	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	Steps map[string]WorkflowStep `json:"steps,omitempty"`
 
@@ -100,7 +100,7 @@ type WorkflowStatus struct {
 	CompletionTime *unversioned.Time `json:"completionTime,omitempty"`
 
 	// Statuses represent status of different steps
-	Statuses map[string]WorkflowStepStatus `json:statuses`
+	Statuses map[string]WorkflowStepStatus `json:"statuses"`
 }
 
 // WorkflowStepStatus contains necessary information for the step status
@@ -117,8 +117,8 @@ func (wf *Workflow) GetObjectKind() unversioned.ObjectKind {
 		APIVersion: "nerdalize.com/v1alpha1",
 	}
 }
-func (wf *WorkflowList) GetObjectKind() k8sApiUnversioned.ObjectKind {
-	return &k8sApiUnversioned.TypeMeta{
+func (wf *WorkflowList) GetObjectKind() unversioned.ObjectKind {
+	return &unversioned.TypeMeta{
 		Kind:       "Workflow",
 		APIVersion: "nerdalize.com/v1alpha1",
 	}
