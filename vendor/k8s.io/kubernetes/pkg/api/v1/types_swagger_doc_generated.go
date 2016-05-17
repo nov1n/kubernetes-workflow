@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -894,6 +894,8 @@ var map_NodeSystemInfo = map[string]string{
 	"containerRuntimeVersion": "ContainerRuntime Version reported by the node through runtime remote API (e.g. docker://1.5.0).",
 	"kubeletVersion":          "Kubelet Version reported by the node.",
 	"kubeProxyVersion":        "KubeProxy Version reported by the node.",
+	"operatingSystem":         "The Operating System reported by the node",
+	"architecture":            "The Architecture reported by the node",
 }
 
 func (NodeSystemInfo) SwaggerDoc() map[string]string {
