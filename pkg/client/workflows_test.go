@@ -124,7 +124,7 @@ func TestList(t *testing.T) {
 									Name: "job1",
 								},
 								Spec: k8sBatch.JobSpec{
-									Parallelism: &paralellism,
+									Parallelism: &parallelism,
 									Template: k8sApi.PodTemplateSpec{
 										ObjectMeta: k8sApi.ObjectMeta{
 											Name: "pod1",
