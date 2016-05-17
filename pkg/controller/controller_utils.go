@@ -10,7 +10,7 @@ import (
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sValidation "k8s.io/kubernetes/pkg/api/validation"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
-	k8sClset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	k8sClSet "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	k8sRec "k8s.io/kubernetes/pkg/client/record"
 	k8sCtl "k8s.io/kubernetes/pkg/controller"
 	k8sLabels "k8s.io/kubernetes/pkg/labels"
@@ -26,7 +26,7 @@ type JobControlInterface interface {
 
 // RealJobControl is the default implementation of JobControlInterface
 type WorkflowJobControl struct {
-	KubeClient k8sClset.Interface
+	KubeClient k8sClSet.Interface
 	Recorder   k8sRec.EventRecorder
 }
 

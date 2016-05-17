@@ -124,7 +124,7 @@ func TestList(t *testing.T) {
 									Name: "job1",
 								},
 								Spec: k8sBatch.JobSpec{
-									Paralellism: &paralellism,
+									Parallelism: &paralellism,
 									Template: k8sApi.PodTemplateSpec{
 										ObjectMeta: k8sApi.ObjectMeta{
 											Name: "pod1",
@@ -190,6 +190,6 @@ func TestList(t *testing.T) {
 		t.Errorf("Error while listing workflows: %v", err)
 	}
 	if !reflect.DeepEqual(list, &expected) {
-		// t.Errorf("Returned list doesn't match expected list\nList: %v\nExpected: %v", list, &expected)
+		t.Errorf("Returned list doesn't match expected list. Diff: \n%v\n", pretty.Compare(list, &expected))
 	}
 }
