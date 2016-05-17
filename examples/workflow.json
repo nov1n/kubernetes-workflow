@@ -23,7 +23,7 @@
                 "containers": [
                   {
                     "image": "ubuntu",
-                    "name": "ubunt1",
+                    "name": "ubuntu1",
                     "command": [
                       "/bin/sleep", "30"
                     ]
