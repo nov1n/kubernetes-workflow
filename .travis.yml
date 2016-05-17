@@ -22,4 +22,7 @@ before_script:
     - go get -u github.com/tools/godep
 
 script:
-    - ./hack/test.sh 
+    - ./hack/test.sh
+
+after_success:
+    - bash <(curl -s https://codecov.io/bash)
