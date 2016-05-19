@@ -58,7 +58,7 @@ type WorkflowSpec struct {
 	Steps map[string]WorkflowStep `json:"steps,omitempty"`
 
 	// Selector for created jobs (if any)
-	Selector *k8sApiUnv.LabelSelector `json:"selector,omitempty"`
+	JobsSelector *k8sApiUnv.LabelSelector `json:"jobsSelector,omitempty"`
 }
 
 // WorkflowStep contains necessary information to identifiy the node of the workflow graph

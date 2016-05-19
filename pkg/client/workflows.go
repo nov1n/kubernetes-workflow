@@ -17,9 +17,11 @@ limitations under the License.
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
@@ -40,10 +42,10 @@ type WorkflowInterface interface {
 	// Get(name string) (*api.Pod, error)
 	// Delete(name string, options *api.DeleteOptions) error
 	// Create(pod *api.Pod) (*api.Pod, error)
-	// Update(pod *api.Pod) (*api.Pod, error)
+	Update(workflow *api.Workflow) (*api.Workflow, error)
 	Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error)
 	// Bind(binding *api.Binding) error
-	// UpdateStatus(pod *api.Pod) (*api.Pod, error)
+	UpdateStatus(workflow *api.Workflow) (*api.Workflow, error)
 	// GetLogs(name string, opts *api.PodLogOptions) *restclient.Request
 }
 
@@ -61,6 +63,52 @@ func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
 		ns:      namespace,
 		nameMap: make(map[string]api.Workflow),
 	}
+}
+
+func (w *workflows) Update(workflow *api.Workflow) (result *api.Workflow, err error) {
+	return w.UpdateWithSubresource(workflow, "")
+}
+
+func (w *workflows) UpdateStatus(workflow *api.Workflow) (result *api.Workflow, err error) {
+	return w.UpdateWithSubresource(workflow, "status")
+}
+
+func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource string) (result *api.Workflow, err error) {
+	nsPath := ""
+	if w.ns != "" {
+		nsPath = "/namespaces/" + w.ns
+	}
+	if subresource != "" {
+		// subresource = "/" + subresource
+	}
+	if workflow.Name == "" {
+		return nil, fmt.Errorf("no name found in workflow")
+	}
+	// @borismattijssen: TODO replace with path.Join
+	url := w.client.baseURL + nsPath + "/workflows/" + workflow.Name
+	b, err := json.Marshal(workflow)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't encode workflow: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(b))
+	if err != nil {
+		return nil, fmt.Errorf("could not reach create request: %v", err)
+	}
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("could not reach %s: %v", url, err)
+	}
+	// bb, _ := ioutil.ReadAll(resp.Body)
+	// buf2 := bytes.NewBuffer(bb)
+	// glog.Infoln(buf2.String())
+	// buf := bytes.NewBuffer(bb)
+	// dec := json.NewDecoder(buf)
+	dec := json.NewDecoder(resp.Body)
+	result = &api.Workflow{}
+	err = dec.Decode(&result)
+	return
 }
 
 func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
@@ -99,7 +147,12 @@ func (w *workflows) Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error) {
 						Object: &wf,
 					}
 				} else {
-					// TODO: Add changed event
+					if reflect.DeepEqual(w.nameMap[wf.Name], wf) == false {
+						watcher.Result <- k8sWatch.Event{
+							Type:   k8sWatch.Modified,
+							Object: &wf,
+						}
+					}
 				}
 				w.nameMap[wf.Name] = wf
 			}

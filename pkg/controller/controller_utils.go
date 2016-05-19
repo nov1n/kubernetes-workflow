@@ -173,3 +173,12 @@ func (f *FakeJobControl) DeleteJob(namespace, name string, object k8sRunt.Object
 	f.DeletedJobNames = append(f.DeletedJobNames, name)
 	return nil
 }
+
+func IsJobFinished(j *k8sBatch.Job) bool {
+	for _, c := range j.Status.Conditions {
+		if (c.Type == k8sBatch.JobComplete || c.Type == k8sBatch.JobFailed) && c.Status == k8sApi.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}

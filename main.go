@@ -21,6 +21,7 @@ import (
 
 	"net"
 
+	"github.com/golang/glog"
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/workflow"
 
@@ -70,4 +71,5 @@ func main() {
 	manager.Run(5, stopChan)
 	<-stopChan
 	fmt.Println("end")
+	glog.Flush()
 }
