@@ -361,7 +361,7 @@ func NewWorkflow() api.Workflow {
 			},
 		},
 		Status: api.WorkflowStatus{
-			StartTime: &k8sApiUnv.Time{time.Date(2009, time.January, 1, 27, 6, 25, 0, time.UTC)},
+			StartTime: &k8sApiUnv.Time{Time: time.Date(2009, time.January, 1, 27, 6, 25, 0, time.UTC)},
 			Statuses: map[string]api.WorkflowStepStatus{
 				"one": {
 					Complete: false,
