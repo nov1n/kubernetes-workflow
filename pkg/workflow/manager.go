@@ -101,7 +101,6 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 	wc.workflowStore.Store, wc.workflowController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
-				// @borismattijssen TODO: allow different namespaces
 				return wc.tpClient.Workflows(k8sApi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options k8sApi.ListOptions) (k8sWatch.Interface, error) {
@@ -117,6 +116,7 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 					// wc.enqueueController(workflow)
 					// fmt.Println("UPDATE")
 				}
+				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
 			},
 			DeleteFunc: wc.enqueueController,
 		},
@@ -212,7 +212,6 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	obj, exists, err := w.workflowStore.Store.GetByKey(key)
 	if !exists {
 		glog.V(3).Infof("Workflow has been deleted: %v", key)
-		w.expectations.DeleteExpectations(key)
 		return nil
 	}
 	if err != nil {
@@ -221,12 +220,12 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 		return err
 	}
 	workflow := *obj.(*api.Workflow)
-
 	// Set defaults for workflow
 	if _, ok := workflow.Labels[workflowUID]; ok == false {
 		newWorkflow, err := w.setLabels(&workflow)
 		if err != nil {
 			glog.Errorf("Couldn't set labels on workflow %v: %v", key, err)
+			w.enqueueController(workflow)
 			return nil
 		}
 		workflow = *newWorkflow
@@ -241,6 +240,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// If this is the first time syncWorkflow is called and
 	// the statuses map is empty, create it
 	if workflow.Status.Statuses == nil {
+		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
 		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
 		now := k8sApiUnv.Now()
 		workflow.Status.StartTime = &now
@@ -449,7 +449,10 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 	case 0: // create job
 		err := w.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
 		if err != nil {
+			glog.Errorf("Couldn't create job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
 			defer k8sUtRunt.HandleError(err)
+		} else {
+			glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
 		}
 	case 1: // update status
 		job := jobList.Items[0]
@@ -458,10 +461,13 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 			glog.Errorf("Unable to get reference from %v: %v", job.Name, err)
 			return false
 		}
+		oldStatus := workflow.Status.Statuses[stepName]
 		jobFinished := controller.IsJobFinished(&job)
 		workflow.Status.Statuses[stepName] = api.WorkflowStepStatus{
 			Complete:  jobFinished,
 			Reference: *reference}
+		glog.V(3).Infof("Updated job status from %v to %v for job %v in step %v for wf %v", oldStatus.Complete,
+			workflow.Status.Statuses[stepName].Complete, step.JobTemplate.Name, stepName, workflow.Name)
 	default: // reconciliate
 		glog.Errorf("WorkflowController.manageWorkfloJob %v too many jobs reported. Need reconciliation.", workflow.Name)
 		return false

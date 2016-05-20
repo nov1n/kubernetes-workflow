@@ -64,9 +64,10 @@ func (s *StoreToWorkflowLister) GetJobWorkflows(job *k8sBatch.Job) (workflows []
 			continue
 		}
 		selector, _ = k8sApiUnv.LabelSelectorAsSelector(workflow.Spec.JobsSelector)
+		glog.V(3).Infof("WF %v has selector %#v", workflow.Name, selector)
 		if selector.Matches(k8sLabels.Set(job.Labels)) {
 			workflows = append(workflows, workflow)
-			glog.V(4).Infof("Found workflow %v retrieving from job %v", workflow.Name, job.Name)
+			glog.V(3).Infof("Found workflow %v retrieving from job %v", workflow.Name, job.Name)
 		}
 	}
 	if len(workflows) == 0 {

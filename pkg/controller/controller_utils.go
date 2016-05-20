@@ -125,7 +125,7 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *k8sBatch.JobTe
 		w.Recorder.Eventf(object, k8sApi.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create job: %v", err)
 	} else {
-		glog.V(4).Infof("Controller %v created job %v", meta.Name, newJob.Name)
+		glog.V(3).Infof("Controller %v created job %v", meta.Name, newJob.Name)
 	}
 	return nil
 }
@@ -141,7 +141,7 @@ func (w WorkflowJobControl) DeleteJob(namespace, jobName string, object k8sRunt.
 			w.Recorder.Eventf(object, k8sApi.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
 			return fmt.Errorf("unable to delete job: %v", err)
 		} else {
-			glog.V(4).Infof("Controller %v deleted job %v", accessor.GetName(), jobName)
+			glog.V(3).Infof("Controller %v deleted job %v", accessor.GetName(), jobName)
 			w.Recorder.Eventf(object, k8sApi.EventTypeNormal, "SuccessfulDelete", "Deleted job: %v", jobName)
 		}
 	*/
