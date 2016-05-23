@@ -172,7 +172,7 @@ func (w *WorkflowManager) getJobWorkflow(job *k8sBatch.Job) *api.Workflow {
 		return nil
 	}
 	if len(workflows) > 1 {
-		glog.Errorf("more then one workflow found for job %v with labels: %+v", job.Name, job.Labels)
+		glog.Errorf("more than one workflow found for job %v with labels: %+v", job.Name, job.Labels)
 		//sort.Sort(byCreationTimestamp(jobs))
 	}
 	return &workflows[0]
@@ -399,16 +399,16 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(k8sCache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("DelteJob: Tombstone not found for obj %v", obj)
+			glog.Errorf("DeleteJob: Tombstone not found for obj %v", obj)
 			return
 		}
-		glog.V(3).Infof("DelteJob: Tombstone found %v", tombstone)
+		glog.V(3).Infof("DeleteJob: Tombstone found %v", tombstone)
 		job, ok = tombstone.Obj.(*k8sBatch.Job)
 		if !ok {
 			glog.Errorf("DeleteJob: Tombstone contained object that is not a job %+v", tombstone)
 			return
 		}
-		glog.V(3).Infof("DelteJob: Job found in tombstone: %v", job)
+		glog.V(3).Infof("DeleteJob: Job found in tombstone: %v", job)
 	}
 	glog.V(3).Infof("DeleteJob old=%v", job.Name)
 	if workflow := w.getJobWorkflow(job); workflow != nil {
