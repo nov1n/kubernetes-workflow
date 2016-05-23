@@ -412,7 +412,6 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 		"spec.steps: Forbidden: cannot delete running step \"one\"": {
 			current: NewWorkflow(),
 			patchCurrent: func(w *api.Workflow) {
-				delete(w.Status.Statuses, "two")
 			},
 			update: NewWorkflow(),
 			patchUpdate: func(w *api.Workflow) {
@@ -422,7 +421,6 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 		"spec.steps: Forbidden: cannot modify running step \"one\"": {
 			current: NewWorkflow(),
 			patchCurrent: func(w *api.Workflow) {
-				delete(w.Status.Statuses, "two")
 			},
 			update: NewWorkflow(),
 			patchUpdate: func(w *api.Workflow) {
