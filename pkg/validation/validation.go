@@ -33,7 +33,7 @@ import (
 // ValidateWorkflow validates a workflow
 func ValidateWorkflow(workflow *api.Workflow) k8sField.ErrorList {
 	// Workflows and rcs have the same name validation
-	allErrs := k8sValidation.ValidateObjectMeta(&workflow.ObjectMeta, true, k8sValidation.ValidateReplicationControllerName, k8sField.NewPath("metadata"))
+	allErrs := k8sValidation.ValidateObjectMeta(&workflow.ObjectMeta, true, k8sValidation.NameIsDNSSubdomain, k8sField.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateWorkflowSpec(&workflow.Spec, k8sField.NewPath("spec"))...)
 	return allErrs
 }
@@ -127,10 +127,15 @@ func ValidateWorkflowSteps(steps map[string]api.WorkflowStep, fieldPath *k8sFiel
 
 func ValidateWorkflowStatus(status *api.WorkflowStatus, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
+
+	if status.Statuses == nil {
+		allErrs = append(allErrs, k8sField.Invalid(fieldPath.Child("statuses"), nil, "statuses map may not be nil"))
+	}
+
 	return allErrs
 }
 
-func getWorkflowUnmodifiableSteps(workflow *api.Workflow) (running, completed map[string]bool) {
+func getWorkflowRunningAndCompletedSteps(workflow *api.Workflow) (running, completed map[string]bool) {
 	running = make(map[string]bool)
 	completed = make(map[string]bool)
 	if workflow.Status.Statuses == nil {
@@ -151,7 +156,7 @@ func getWorkflowUnmodifiableSteps(workflow *api.Workflow) (running, completed ma
 func ValidateWorkflowUpdate(workflow, oldWorkflow *api.Workflow) k8sField.ErrorList {
 	allErrs := k8sValidation.ValidateObjectMetaUpdate(&workflow.ObjectMeta, &oldWorkflow.ObjectMeta, k8sField.NewPath("metadata"))
 
-	runningSteps, completedSteps := getWorkflowUnmodifiableSteps(oldWorkflow)
+	runningSteps, completedSteps := getWorkflowRunningAndCompletedSteps(oldWorkflow)
 	allCompleted := true
 	for k := range oldWorkflow.Spec.Steps {
 		if !completedSteps[k] {
@@ -165,12 +170,7 @@ func ValidateWorkflowUpdate(workflow, oldWorkflow *api.Workflow) k8sField.ErrorL
 	}
 
 	allErrs = append(allErrs, ValidateWorkflowSpecUpdate(&workflow.Spec, &oldWorkflow.Spec, runningSteps, completedSteps, k8sField.NewPath("spec"))...)
-	return allErrs
-}
-
-func ValidateWorkflowUpdateStatus(workflow, oldWorkflow *api.Workflow) k8sField.ErrorList {
-	allErrs := k8sValidation.ValidateObjectMetaUpdate(&oldWorkflow.ObjectMeta, &workflow.ObjectMeta, k8sField.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateWorkflowStatusUpdate(workflow.Status, oldWorkflow.Status)...)
+	allErrs = append(allErrs, ValidateWorkflowStatusUpdate(&workflow.Status, &oldWorkflow.Status, k8sField.NewPath("status"))...)
 	return allErrs
 }
 
@@ -213,8 +213,9 @@ func ValidateWorkflowSpecUpdate(spec, oldSpec *api.WorkflowSpec, running, comple
 	return allErrs
 }
 
-func ValidateWorkflowStatusUpdate(status, oldStatus api.WorkflowStatus) k8sField.ErrorList {
+func ValidateWorkflowStatusUpdate(status, oldStatus *api.WorkflowStatus, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
-	allErrs = append(allErrs, ValidateWorkflowStatus(&status, k8sField.NewPath("status"))...)
+	allErrs = append(allErrs, ValidateWorkflowStatus(status, fieldPath)...)
+
 	return allErrs
 }

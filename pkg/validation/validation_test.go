@@ -15,7 +15,7 @@ import (
 
 func TestValidateWorkflowSpec(t *testing.T) {
 	successCases := map[string]api.Workflow{
-		"K1": {
+		"one step, no dependencies": {
 			ObjectMeta: k8sApi.ObjectMeta{
 				Name:      "mydag",
 				Namespace: k8sApi.NamespaceDefault,
@@ -24,13 +24,12 @@ func TestValidateWorkflowSpec(t *testing.T) {
 			Spec: api.WorkflowSpec{
 				Steps: map[string]api.WorkflowStep{
 					"one": {},
-				},
-				Selector: &k8sApiUnv.LabelSelector{
+				}, Selector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
 		},
-		"2K1": {
+		"two steps, no dependencies": {
 			ObjectMeta: k8sApi.ObjectMeta{
 				Name:      "mydag",
 				Namespace: k8sApi.NamespaceDefault,
@@ -46,11 +45,10 @@ func TestValidateWorkflowSpec(t *testing.T) {
 				},
 			},
 		},
-		"K2": {
+		"two steps, one with dependencies": {
 			ObjectMeta: k8sApi.ObjectMeta{
-				Name:      "mydag",
-				Namespace: k8sApi.NamespaceDefault,
-				UID:       k8sTypes.UID("1uid1cafe"),
+				Name: "mydag", Namespace: k8sApi.NamespaceDefault,
+				UID: k8sTypes.UID("1uid1cafe"),
 			},
 			Spec: api.WorkflowSpec{
 				Steps: map[string]api.WorkflowStep{
@@ -64,7 +62,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 				},
 			},
 		},
-		"2K2": {
+		"two steps, two with dependencies": {
 			ObjectMeta: k8sApi.ObjectMeta{
 				Name:      "mydag",
 				Namespace: k8sApi.NamespaceDefault,
@@ -86,7 +84,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 				},
 			},
 		},
-		"K3": {
+		"three steps, two with dependencies": {
 			ObjectMeta: k8sApi.ObjectMeta{
 				Name:      "mydag",
 				Namespace: k8sApi.NamespaceDefault,
@@ -107,7 +105,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 				},
 			},
 		},
-		"custom": {
+		"realistic with two steps, one with dependencies": {
 			TypeMeta: k8sApiUnv.TypeMeta{
 				Kind:       "Workflow",
 				APIVersion: "nerdalize.com/v1alpha1",
@@ -330,10 +328,12 @@ func TestValidateWorkflowSpec(t *testing.T) {
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		} else {
-			s := strings.Split(k, ":")
+			s := strings.SplitN(k, ":", 2)
 			err := errs[0]
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
-				t.Errorf("unexpected error: %v, expected: %s", err, k)
+				t.Errorf("%v, %v", err.Field, s[0])
+				t.Errorf("unexpected error: %v, expected: %s", err.Error(), s[1])
+				//t.Errorf("unexpected error: %v, expected: %s", err, k)
 			}
 		}
 	}
@@ -383,6 +383,13 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 		patchUpdate  func(*api.Workflow)
 	}
 	errorCases := map[string]WorkflowPair{
+		"status.statuses: Invalid value: null: statuses map may not be nil": {
+			current: NewWorkflow(),
+			update:  NewWorkflow(),
+			patchUpdate: func(w *api.Workflow) {
+				w.Status.Statuses = nil
+			},
+		},
 		"metadata.resourceVersion: Invalid value: \"\": must be specified for an update": {
 			current: NewWorkflow(),
 			update:  NewWorkflow(),
@@ -394,10 +401,10 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 			current: NewWorkflow(),
 			patchCurrent: func(w *api.Workflow) {
 				s1 := w.Status.Statuses["one"]
-				s1.Complete = true // one is complete
+				s1.Complete = true
 				w.Status.Statuses["one"] = s1
 				s2 := w.Status.Statuses["two"]
-				s2.Complete = true // two is complete
+				s2.Complete = true
 				w.Status.Statuses["two"] = s2
 			},
 			update: NewWorkflow(),
@@ -405,19 +412,17 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 		"spec.steps: Forbidden: cannot delete running step \"one\"": {
 			current: NewWorkflow(),
 			patchCurrent: func(w *api.Workflow) {
-				delete(w.Status.Statuses, "two") // one is running
+				delete(w.Status.Statuses, "two")
 			},
 			update: NewWorkflow(),
 			patchUpdate: func(w *api.Workflow) {
-				// we delete "one"
 				delete(w.Spec.Steps, "one") // trying to remove a running step
-				delete(w.Status.Statuses, "two")
 			},
 		},
 		"spec.steps: Forbidden: cannot modify running step \"one\"": {
 			current: NewWorkflow(),
 			patchCurrent: func(w *api.Workflow) {
-				delete(w.Status.Statuses, "two") // one is running
+				delete(w.Status.Statuses, "two")
 			},
 			update: NewWorkflow(),
 			patchUpdate: func(w *api.Workflow) {
@@ -426,16 +431,14 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 				s.JobTemplate = nil
 				s.ExternalRef = &k8sApi.ObjectReference{}
 				w.Spec.Steps["one"] = s
-				delete(w.Status.Statuses, "two")
 			},
 		},
 		"spec.steps: Forbidden: cannot delete completed step \"one\"": {
 			current: NewWorkflow(),
 			patchCurrent: func(w *api.Workflow) {
 				s := w.Status.Statuses["one"]
-				s.Complete = true // one is complete
+				s.Complete = true
 				w.Status.Statuses["one"] = s
-				delete(w.Status.Statuses, "two") // two is running
 			},
 			update: NewWorkflow(),
 			patchUpdate: func(w *api.Workflow) {
@@ -446,9 +449,8 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 			current: NewWorkflow(),
 			patchCurrent: func(w *api.Workflow) {
 				s := w.Status.Statuses["one"]
-				s.Complete = true // one is complete
+				s.Complete = true
 				w.Status.Statuses["one"] = s
-				delete(w.Status.Statuses, "two") // two is running
 			},
 			update: NewWorkflow(),
 			patchUpdate: func(w *api.Workflow) {
@@ -457,7 +459,6 @@ func TestValidateWorkflowUpdate(t *testing.T) {
 				s.JobTemplate = nil
 				s.ExternalRef = &k8sApi.ObjectReference{}
 				w.Spec.Steps["one"] = s
-				delete(w.Status.Statuses, "two") // two always running
 			},
 		},
 	}
