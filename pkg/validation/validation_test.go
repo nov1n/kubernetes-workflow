@@ -24,7 +24,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 			Spec: api.WorkflowSpec{
 				Steps: map[string]api.WorkflowStep{
 					"one": {},
-				}, Selector: &k8sApiUnv.LabelSelector{
+				}, JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -40,7 +40,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 					"one": {},
 					"two": {},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -57,7 +57,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						Dependencies: []string{"one"},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -79,7 +79,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						Dependencies: []string{"three"},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -100,7 +100,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						Dependencies: []string{"one", "two"},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -176,7 +176,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -202,7 +202,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						Dependencies: []string{"one"},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -222,7 +222,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						Dependencies: []string{"one"},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -252,7 +252,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						Dependencies: []string{"five"},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -270,7 +270,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						Dependencies: []string{"three"},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -286,12 +286,12 @@ func TestValidateWorkflowSpec(t *testing.T) {
 					"one": {},
 				},
 				ActiveDeadlineSeconds: &negative64,
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
 		},
-		"spec.selector: Required value": {
+		"spec.jobsSelector: Required value": {
 			ObjectMeta: k8sApi.ObjectMeta{
 				Name:      "mydag",
 				Namespace: k8sApi.NamespaceDefault,
@@ -316,7 +316,7 @@ func TestValidateWorkflowSpec(t *testing.T) {
 						ExternalRef: &k8sApi.ObjectReference{},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},
@@ -356,7 +356,7 @@ func NewWorkflow() api.Workflow {
 					JobTemplate: &k8sBatch.JobTemplateSpec{},
 				},
 			},
-			Selector: &k8sApiUnv.LabelSelector{
+			JobsSelector: &k8sApiUnv.LabelSelector{
 				MatchLabels: map[string]string{"a": "b"},
 			},
 		},
