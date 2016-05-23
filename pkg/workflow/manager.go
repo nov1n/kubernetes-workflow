@@ -172,7 +172,7 @@ func (w *WorkflowManager) getJobWorkflow(job *k8sBatch.Job) *api.Workflow {
 		return nil
 	}
 	if len(workflows) > 1 {
-		glog.Errorf("user error! more than one workflow is selecting jobs with labels: %+v", job.Labels)
+		glog.Errorf("more then one workflow found for job %v with labels: %+v", job.Name, job.Labels)
 		//sort.Sort(byCreationTimestamp(jobs))
 	}
 	return &workflows[0]
@@ -226,18 +226,19 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	}
 	workflow := *obj.(*api.Workflow)
 	// Set defaults for workflow
-	if _, ok := workflow.Labels[workflowUID]; ok == false {
+	if _, ok := workflow.Labels[workflowUID]; !ok {
 		newWorkflow, err := w.setLabels(&workflow)
 		if err != nil {
-			if serr, ok := err.(*k8sApiErr.StatusError); ok {
-				if serr.Status().Code == http.StatusConflict {
-					glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-					w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-					return nil
-				}
+			serr, ok := err.(*k8sApiErr.StatusError)
+			if !ok {
+				glog.Errorf("Couldn't set labels on workflow %v: %v", key, err)
+				w.enqueueController(workflow)
+				return nil
 			}
-			glog.Errorf("Couldn't set labels on workflow %v: %v", key, err)
-			w.enqueueController(workflow)
+			if serr.Status().Code == http.StatusConflict {
+				glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
+			}
 			return nil
 		}
 		workflow = *newWorkflow
@@ -303,15 +304,17 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// Try to schedule suitable steps
 	if w.manageWorkflow(&workflow) {
 		if err := w.updateHandler(&workflow); err != nil {
-			if serr, ok := err.(*k8sApiErr.StatusError); ok {
-				if serr.Status().Code == http.StatusConflict {
-					glog.V(2).Infof("encountered status conflict on workflow update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-					w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-					return nil
-				}
+			serr, ok := err.(*k8sApiErr.StatusError)
+			if !ok {
+				glog.Errorf("Failed to update workflow %v, requeuing.  Error: %v", workflow.Name, err)
+				w.enqueueController(&workflow)
+				return nil
 			}
-			glog.Errorf("Failed to update workflow %v, requeuing.  Error: %v", workflow.Name, err)
-			w.enqueueController(&workflow)
+			if serr.Status().Code == http.StatusConflict {
+				glog.V(2).Infof("encountered status conflict on workflow update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
+			}
+			return nil
 		}
 	}
 
@@ -339,7 +342,6 @@ func pastActiveDeadline(workflow *api.Workflow) bool {
 }
 
 func (w *WorkflowManager) updateWorkflowStatus(workflow *api.Workflow) error {
-	// _, err := w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
 	_, err := w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
 	return err
 }
@@ -368,6 +370,7 @@ func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
 }
 
 func (w *WorkflowManager) addJob(obj interface{}) {
+	// type safety enforced by Informer
 	job := obj.(*k8sBatch.Job)
 	glog.V(3).Infof("addJob %v", job.Name)
 	if workflow := w.getJobWorkflow(job); workflow != nil {
@@ -376,6 +379,7 @@ func (w *WorkflowManager) addJob(obj interface{}) {
 }
 
 func (w *WorkflowManager) updateJob(old, cur interface{}) {
+	// type safety enforced by Informer
 	oldJob := old.(*k8sBatch.Job)
 	curJob := cur.(*k8sBatch.Job)
 	glog.V(3).Infof("updateJob old=%v, cur=%v ", oldJob.Name, curJob.Name)
@@ -390,22 +394,23 @@ func (w *WorkflowManager) updateJob(old, cur interface{}) {
 }
 
 func (w *WorkflowManager) deleteJob(obj interface{}) {
+	// type safety enforced by Informer
 	job, ok := obj.(*k8sBatch.Job)
 	if !ok {
 		tombstone, ok := obj.(k8sCache.DeletedFinalStateUnknown)
-		glog.V(3).Infof("Tombstone found %v", tombstone)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			glog.Errorf("DelteJob: Tombstone not found for obj %v", obj)
 			return
 		}
+		glog.V(3).Infof("DelteJob: Tombstone found %v", tombstone)
 		job, ok = tombstone.Obj.(*k8sBatch.Job)
-		glog.V(3).Infof("Job found in tombstone %v", job)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a job %+v", obj)
+			glog.Errorf("DeleteJob: Tombstone contained object that is not a job %+v", tombstone)
 			return
 		}
+		glog.V(3).Infof("DelteJob: Job found in tombstone: %v", job)
 	}
-	glog.V(3).Infof("deleteJob old=%v", job.Name)
+	glog.V(3).Infof("DeleteJob old=%v", job.Name)
 	if workflow := w.getJobWorkflow(job); workflow != nil {
 		w.enqueueController(workflow)
 	}
@@ -451,14 +456,14 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 }
 
 func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
-	for _, dependcyName := range step.Dependencies {
-		if dependencyStatus, ok := workflow.Status.Statuses[dependcyName]; !ok || !dependencyStatus.Complete {
-			glog.V(3).Infof("Dependecy %v not satisfied for %v", dependcyName, stepName)
+	for _, dependencyName := range step.Dependencies {
+		if dependencyStatus, ok := workflow.Status.Statuses[dependencyName]; !ok || !dependencyStatus.Complete {
+			glog.V(3).Infof("Dependency %v not satisfied for %v", dependencyName, stepName)
 			return false
 		}
 	}
 
-	// all dependency satisfied (or missing) need action: update or create step
+	// all dependencies satisfied (or missing) need action: update or create step
 	key, err := k8sCtl.KeyFunc(workflow)
 	if err != nil {
 		glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)

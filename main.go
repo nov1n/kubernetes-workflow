@@ -33,6 +33,8 @@ import (
 )
 
 func main() {
+	defer glog.Flush()
+
 	// Parse cmdline flags
 	host := flag.String("host", "127.0.0.1", "IP address of kubernetes API server")
 	port := flag.String("port", "8080", "Port of the kubernetes API server")
@@ -70,6 +72,4 @@ func main() {
 	stopChan := make(chan struct{})
 	manager.Run(5, stopChan)
 	<-stopChan
-	fmt.Println("end")
-	glog.Flush()
 }
