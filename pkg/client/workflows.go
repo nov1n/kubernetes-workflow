@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"reflect"
 	"time"
@@ -28,6 +29,8 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/watch"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
+	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
+	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
@@ -100,14 +103,20 @@ func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource st
 	if err != nil {
 		return nil, fmt.Errorf("could not reach %s: %v", url, err)
 	}
-	// bb, _ := ioutil.ReadAll(resp.Body)
-	// buf2 := bytes.NewBuffer(bb)
-	// glog.Infoln(buf2.String())
-	// buf := bytes.NewBuffer(bb)
-	// dec := json.NewDecoder(buf)
-	dec := json.NewDecoder(resp.Body)
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("could not read from response body: %v", err)
+	}
 	result = &api.Workflow{}
-	err = dec.Decode(&result)
+	err = json.Unmarshal(data, result)
+	if err != nil {
+		status := &k8sApiUnv.Status{}
+		err = json.Unmarshal(data, status)
+		if err == nil {
+			return nil, &k8sApiErr.StatusError{ErrStatus: *status}
+		}
+		return nil, fmt.Errorf("could not decode into api.Workflow or k8sApiUnv.Status: %v", err)
+	}
 	return
 }
 

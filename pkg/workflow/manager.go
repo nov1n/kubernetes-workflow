@@ -17,6 +17,7 @@ limitations under the License.
 package workflow
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/golang/glog"
@@ -25,6 +26,7 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/client/cache"
 	"github.com/nov1n/kubernetes-workflow/pkg/controller"
 	k8sApi "k8s.io/kubernetes/pkg/api"
+	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 	k8sCache "k8s.io/kubernetes/pkg/client/cache"
@@ -42,7 +44,10 @@ import (
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
-const workflowUID = "workflow-uid"
+const (
+	workflowUID                    = "workflow-uid"
+	requeueAfterStatusConflictTime = 500 * time.Millisecond
+)
 
 type WorkflowManager struct {
 	oldKubeClient k8sCl.Interface
@@ -224,6 +229,13 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	if _, ok := workflow.Labels[workflowUID]; ok == false {
 		newWorkflow, err := w.setLabels(&workflow)
 		if err != nil {
+			if serr, ok := err.(*k8sApiErr.StatusError); ok {
+				if serr.Status().Code == http.StatusConflict {
+					glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+					w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
+					return nil
+				}
+			}
 			glog.Errorf("Couldn't set labels on workflow %v: %v", key, err)
 			w.enqueueController(workflow)
 			return nil
@@ -291,8 +303,14 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// Try to schedule suitable steps
 	if w.manageWorkflow(&workflow) {
 		if err := w.updateHandler(&workflow); err != nil {
+			if serr, ok := err.(*k8sApiErr.StatusError); ok {
+				if serr.Status().Code == http.StatusConflict {
+					glog.V(2).Infof("encountered status conflict on workflow update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+					w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
+					return nil
+				}
+			}
 			glog.Errorf("Failed to update workflow %v, requeuing.  Error: %v", workflow.Name, err)
-			time.Sleep(1000 * time.Millisecond)
 			w.enqueueController(&workflow)
 		}
 	}
@@ -337,6 +355,16 @@ func (w *WorkflowManager) enqueueController(obj interface{}) {
 		return
 	}
 	w.queue.Add(key)
+}
+
+// enqueueAfter enqueue's a workflow after a given time.
+// enqueueAfter is non-blocking
+func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
+	go func() {
+		time.Sleep(d)
+		w.enqueueController(obj)
+	}()
+	return
 }
 
 func (w *WorkflowManager) addJob(obj interface{}) {
