@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Define die function
+die() { echo "$@" 1>&2 ; exit 1; }
+
 # Initialize error
 ERROR=""
 
