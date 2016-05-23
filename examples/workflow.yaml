@@ -1,43 +1,50 @@
-apiVersion: nerdalize.com/v1alpha1
-kind: Workflow
-metadata:
-  name: test-workflow
-spec:
-  activeDeadlineSeconds: 3600
-  steps:
-    step-a:
-      jobTemplate:
-        metadata:
-          name: job1
-        spec:
-          parallelism: 1
-          template:
-            metadata:
-              name: pod1
-            spec:
-              restartPolicy: OnFailure
-              containers:
-                - image: ubuntu
-                  name: ubuntu1
-                  command:
-                    - /bin/sleep
-                    - 30
-    step-b:
-      dependencies:
-        - step-a
-      jobTemplate:
-        metadata:
-          name: job2
-        spec:
-          parallelism: 1
-          template:
-            metadata:
-              name: pod2
-            spec:
-              restartPolicy: OnFailure
-              containers:
-                - image: ubuntu
-                  name: ubuntu2
-                  command:
-                    - /bin/sleep
-                    - 30
+---
+  apiVersion: "nerdalize.com/v1alpha1"
+  kind: "Workflow"
+  metadata: 
+    name: "test-workflow"
+  spec: 
+    activeDeadlineSeconds: 3600
+    steps: 
+      step-a: 
+        jobTemplate: 
+          metadata: 
+            name: "job1"
+          spec: 
+            parallelism: 1
+            template: 
+              metadata: 
+                name: "pod1"
+              spec: 
+                restartPolicy: "OnFailure"
+                containers: 
+                  - 
+                    image: "ubuntu"
+                    name: "ubuntu1"
+                    command: 
+                      - "/bin/sleep"
+                      - "30"
+      step-b: 
+        dependencies: 
+          - "step-a"
+        jobTemplate: 
+          metadata: 
+            name: "job2"
+          spec: 
+            parallelism: 1
+            template: 
+              metadata: 
+                name: "pod2"
+              spec: 
+                restartPolicy: "OnFailure"
+                containers: 
+                  - 
+                    image: "ubuntu"
+                    name: "ubuntu2"
+                    command: 
+                      - "/bin/sleep"
+                      - "30"
+    selector: 
+      matchLabels: 
+        a: "b"
+

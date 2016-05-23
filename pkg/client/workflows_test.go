@@ -29,6 +29,7 @@ import (
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
+	k8sTypes "k8s.io/kubernetes/pkg/types"
 )
 
 const jsonList = `{"kind": "WorkflowList","items": [
@@ -36,7 +37,9 @@ const jsonList = `{"kind": "WorkflowList","items": [
   "apiVersion": "nerdalize.com/v1alpha1",
   "kind": "Workflow",
   "metadata": {
-    "name": "test-workflow"
+    "name": "test-workflow",
+	"namespace": "default",
+	"uid": "1uid1cafe"
   },
   "spec": {
     "activeDeadlineSeconds": 3600,
@@ -98,7 +101,12 @@ const jsonList = `{"kind": "WorkflowList","items": [
           }
         }
       }
-    }
+    },
+	"selector": {
+		"matchLabels": {
+			"a": "b"
+		}
+	}
   }
 }
 ]}`
@@ -117,43 +125,42 @@ func getClient(output string) (tpc *ThirdPartyClient, err error) {
 }
 
 func TestList(t *testing.T) {
-	var parallelism int32 = 1
 	expected := api.WorkflowList{
 		TypeMeta: k8sApiUnv.TypeMeta{
 			Kind: "WorkflowList",
 		},
-		Items: []api.Workflow{
-			api.Workflow{
-				TypeMeta: k8sApiUnv.TypeMeta{
-					Kind:       "Workflow",
-					APIVersion: "nerdalize.com/v1alpha1",
-				},
-				ObjectMeta: k8sApi.ObjectMeta{
-					Name: "test-workflow",
-				},
-				Spec: api.WorkflowSpec{
-					ActiveDeadlineSeconds: 3600,
-					Steps: map[string]api.WorkflowStep{
-						"step-a": api.WorkflowStep{
-							JobTemplate: &k8sBatch.JobTemplateSpec{
-								ObjectMeta: k8sApi.ObjectMeta{
-									Name: "job1",
-								},
-								Spec: k8sBatch.JobSpec{
-									Parallelism: &parallelism,
-									Template: k8sApi.PodTemplateSpec{
-										ObjectMeta: k8sApi.ObjectMeta{
-											Name: "pod1",
-										},
-										Spec: k8sApi.PodSpec{
-											RestartPolicy: "OnFailure",
-											Containers: []k8sApi.Container{
-												k8sApi.Container{
-													Name:  "ubuntu1",
-													Image: "ubuntu",
-													Command: []string{
-														"/bin/sleep", "30",
-													},
+		Items: []api.Workflow{api.Workflow{
+			TypeMeta: k8sApiUnv.TypeMeta{
+				Kind:       "Workflow",
+				APIVersion: "nerdalize.com/v1alpha1",
+			},
+			ObjectMeta: k8sApi.ObjectMeta{
+				Name:      "test-workflow",
+				Namespace: k8sApi.NamespaceDefault,
+				UID:       k8sTypes.UID("1uid1cafe"),
+			},
+			Spec: api.WorkflowSpec{
+				ActiveDeadlineSeconds: func(i int64) *int64 { return &i }(3600),
+				Steps: map[string]api.WorkflowStep{
+					"step-a": api.WorkflowStep{
+						JobTemplate: &k8sBatch.JobTemplateSpec{
+							ObjectMeta: k8sApi.ObjectMeta{
+								Name: "job1",
+							},
+							Spec: k8sBatch.JobSpec{
+								Parallelism: func(i int32) *int32 { return &i }(1),
+								Template: k8sApi.PodTemplateSpec{
+									ObjectMeta: k8sApi.ObjectMeta{
+										Name: "pod1",
+									},
+									Spec: k8sApi.PodSpec{
+										RestartPolicy: "OnFailure",
+										Containers: []k8sApi.Container{
+											k8sApi.Container{
+												Name:  "ubuntu1",
+												Image: "ubuntu",
+												Command: []string{
+													"/bin/sleep", "30",
 												},
 											},
 										},
@@ -161,29 +168,29 @@ func TestList(t *testing.T) {
 								},
 							},
 						},
-						"step-b": api.WorkflowStep{
-							Dependencies: []string{
-								"step-a",
+					},
+					"step-b": api.WorkflowStep{
+						Dependencies: []string{
+							"step-a",
+						},
+						JobTemplate: &k8sBatch.JobTemplateSpec{
+							ObjectMeta: k8sApi.ObjectMeta{
+								Name: "job2",
 							},
-							JobTemplate: &k8sBatch.JobTemplateSpec{
-								ObjectMeta: k8sApi.ObjectMeta{
-									Name: "job2",
-								},
-								Spec: k8sBatch.JobSpec{
-									Parallelism: &parallelism,
-									Template: k8sApi.PodTemplateSpec{
-										ObjectMeta: k8sApi.ObjectMeta{
-											Name: "pod2",
-										},
-										Spec: k8sApi.PodSpec{
-											RestartPolicy: "OnFailure",
-											Containers: []k8sApi.Container{
-												k8sApi.Container{
-													Name:  "ubuntu2",
-													Image: "ubuntu",
-													Command: []string{
-														"/bin/sleep", "30",
-													},
+							Spec: k8sBatch.JobSpec{
+								Parallelism: func(i int32) *int32 { return &i }(1),
+								Template: k8sApi.PodTemplateSpec{
+									ObjectMeta: k8sApi.ObjectMeta{
+										Name: "pod2",
+									},
+									Spec: k8sApi.PodSpec{
+										RestartPolicy: "OnFailure",
+										Containers: []k8sApi.Container{
+											k8sApi.Container{
+												Name:  "ubuntu2",
+												Image: "ubuntu",
+												Command: []string{
+													"/bin/sleep", "30",
 												},
 											},
 										},
@@ -193,7 +200,11 @@ func TestList(t *testing.T) {
 						},
 					},
 				},
+				Selector: &k8sApiUnv.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
 			},
+		},
 		},
 	}
 	tpc, err := getClient(jsonList)

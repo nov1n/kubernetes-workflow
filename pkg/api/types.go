@@ -53,7 +53,7 @@ type WorkflowSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	k8sApi.ObjectMeta `json:"metadata,omitempty"`
 
-	ActiveDeadlineSeconds int64 `json:"activeDeadlineSeconds,omitempty"`
+	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
 	Steps map[string]WorkflowStep `json:"steps,omitempty"`
 
