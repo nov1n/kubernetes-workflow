@@ -359,7 +359,7 @@ func (w *WorkflowManager) enqueueController(obj interface{}) {
 	w.queue.Add(key)
 }
 
-// enqueueAfter enqueue's a workflow after a given time.
+// enqueueAfter enqueues a workflow after a given time.
 // enqueueAfter is non-blocking
 func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
 	go func() {
