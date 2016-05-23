@@ -131,20 +131,6 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *k8sBatch.JobTe
 }
 
 func (w WorkflowJobControl) DeleteJob(namespace, jobName string, object k8sRunt.Object) error {
-	// @sdminonne: TODO once clientset is fixed implement DeleteJob
-	/*
-		accessor, err := meta.Accessor(object)
-		if err != nil {
-			return fmt.Errorf("object does not have ObjectMeta, %v", err)
-		}
-		if err := w.Client.Batch().Jobs(namespace).Delete(jobName, nil); err != nil {
-			w.Recorder.Eventf(object, k8sApi.EventTypeWarning, "FailedDelete", "Error deleting: %v", err)
-			return fmt.Errorf("unable to delete job: %v", err)
-		} else {
-			glog.V(3).Infof("Controller %v deleted job %v", accessor.GetName(), jobName)
-			w.Recorder.Eventf(object, k8sApi.EventTypeNormal, "SuccessfulDelete", "Deleted job: %v", jobName)
-		}
-	*/
 	return nil
 }
 
