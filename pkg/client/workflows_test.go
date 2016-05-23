@@ -102,7 +102,7 @@ const jsonList = `{"kind": "WorkflowList","items": [
         }
       }
     },
-	"selector": {
+	"jobsSelector": {
 		"matchLabels": {
 			"a": "b"
 		}
@@ -200,7 +200,7 @@ func TestList(t *testing.T) {
 						},
 					},
 				},
-				Selector: &k8sApiUnv.LabelSelector{
+				JobsSelector: &k8sApiUnv.LabelSelector{
 					MatchLabels: map[string]string{"a": "b"},
 				},
 			},

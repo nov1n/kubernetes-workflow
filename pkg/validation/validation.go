@@ -44,10 +44,10 @@ func ValidateWorkflowSpec(spec *api.WorkflowSpec, fieldPath *k8sField.Path) k8sF
 	if spec.ActiveDeadlineSeconds != nil {
 		allErrs = append(allErrs, k8sValidation.ValidateNonnegativeField(int64(*spec.ActiveDeadlineSeconds), fieldPath.Child("activeDeadlineSeconds"))...)
 	}
-	if spec.Selector == nil {
-		allErrs = append(allErrs, k8sField.Required(fieldPath.Child("selector"), ""))
+	if spec.JobsSelector == nil {
+		allErrs = append(allErrs, k8sField.Required(fieldPath.Child("jobsSelector"), ""))
 	} else {
-		allErrs = append(allErrs, k8sValidationUnv.ValidateLabelSelector(spec.Selector, fieldPath.Child("selector"))...)
+		allErrs = append(allErrs, k8sValidationUnv.ValidateLabelSelector(spec.JobsSelector, fieldPath.Child("jobsSelector"))...)
 	}
 	allErrs = append(allErrs, ValidateWorkflowSteps(spec.Steps, fieldPath.Child("steps"))...)
 	return allErrs
@@ -177,7 +177,7 @@ func ValidateWorkflowUpdate(workflow, oldWorkflow *api.Workflow) k8sField.ErrorL
 func ValidateWorkflowSpecUpdate(spec, oldSpec *api.WorkflowSpec, running, completed map[string]bool, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
 	allErrs = append(allErrs, ValidateWorkflowSpec(spec, fieldPath)...)
-	allErrs = append(allErrs, k8sValidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fieldPath.Child("selector"))...)
+	allErrs = append(allErrs, k8sValidation.ValidateImmutableField(spec.JobsSelector, oldSpec.JobsSelector, fieldPath.Child("jobsSelector"))...)
 
 	newSteps := k8sSets.NewString()
 	for k := range spec.Steps {
