@@ -175,6 +175,8 @@ func init() {
 		DeepCopy_api_ServiceSpec,
 		DeepCopy_api_ServiceStatus,
 		DeepCopy_api_TCPSocketAction,
+		DeepCopy_api_Taint,
+		DeepCopy_api_Toleration,
 		DeepCopy_api_Volume,
 		DeepCopy_api_VolumeMount,
 		DeepCopy_api_VolumeSource,
@@ -2232,6 +2234,17 @@ func DeepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	} else {
 		out.Volumes = nil
 	}
+	if in.InitContainers != nil {
+		in, out := in.InitContainers, &out.InitContainers
+		*out = make([]Container, len(in))
+		for i := range in {
+			if err := DeepCopy_api_Container(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainers = nil
+	}
 	if in.Containers != nil {
 		in, out := in.Containers, &out.Containers
 		*out = make([]Container, len(in))
@@ -2320,6 +2333,17 @@ func DeepCopy_api_PodStatus(in PodStatus, out *PodStatus, c *conversion.Cloner) 
 		}
 	} else {
 		out.StartTime = nil
+	}
+	if in.InitContainerStatuses != nil {
+		in, out := in.InitContainerStatuses, &out.InitContainerStatuses
+		*out = make([]ContainerStatus, len(in))
+		for i := range in {
+			if err := DeepCopy_api_ContainerStatus(in[i], &(*out)[i], c); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.InitContainerStatuses = nil
 	}
 	if in.ContainerStatuses != nil {
 		in, out := in.ContainerStatuses, &out.ContainerStatuses
@@ -2942,6 +2966,21 @@ func DeepCopy_api_TCPSocketAction(in TCPSocketAction, out *TCPSocketAction, c *c
 	if err := intstr.DeepCopy_intstr_IntOrString(in.Port, &out.Port, c); err != nil {
 		return err
 	}
+	return nil
+}
+
+func DeepCopy_api_Taint(in Taint, out *Taint, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Value = in.Value
+	out.Effect = in.Effect
+	return nil
+}
+
+func DeepCopy_api_Toleration(in Toleration, out *Toleration, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	out.Value = in.Value
+	out.Effect = in.Effect
 	return nil
 }
 

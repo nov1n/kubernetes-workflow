@@ -50,7 +50,7 @@ var _ JobControlInterface = &WorkflowJobControl{}
 
 func getJobsPrefix(controllerName string) string {
 	prefix := fmt.Sprintf("%s-", controllerName)
-	if ok, _ := k8sValidation.ValidateReplicationControllerName(prefix, true); !ok {
+	if errs := k8sValidation.NameIsDNSSubdomain(prefix, true); errs != nil {
 		prefix = controllerName
 	}
 	return prefix

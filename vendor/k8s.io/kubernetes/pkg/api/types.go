@@ -411,6 +411,10 @@ const (
 	ClaimPending PersistentVolumeClaimPhase = "Pending"
 	// used for PersistentVolumeClaims that are bound
 	ClaimBound PersistentVolumeClaimPhase = "Bound"
+	// used for PersistentVolumeClaims that lost their underlying
+	// PersistentVolume. The claim was bound to a PersistentVolume and this
+	// volume does not exist any longer and all data on it was lost.
+	ClaimLost PersistentVolumeClaimPhase = "Lost"
 )
 
 // Represents a host path mapped into a pod.
@@ -1076,6 +1080,8 @@ const (
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
 	PodReady PodConditionType = "Ready"
+	// PodInitialized means that all init containers in the pod have started successfully.
+	PodInitialized PodConditionType = "Initialized"
 )
 
 type PodCondition struct {
@@ -1306,10 +1312,79 @@ type PreferredSchedulingTerm struct {
 	Preference NodeSelectorTerm `json:"preference"`
 }
 
+// The node this Taint is attached to has the effect "effect" on
+// any pod that that does not tolerate the Taint.
+type Taint struct {
+	// Required. The taint key to be applied to a node.
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key"`
+	// Required. The taint value corresponding to the taint key.
+	Value string `json:"value,omitempty"`
+	// Required. The effect of the taint on pods
+	// that do not tolerate the taint.
+	// Valid effects are NoSchedule and PreferNoSchedule.
+	Effect TaintEffect `json:"effect"`
+}
+
+type TaintEffect string
+
+const (
+	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
+	// but allow all pods submitted to Kubelet without going through the scheduler
+	// to start, and allow all already-running pods to continue running.
+	// Enforced by the scheduler.
+	TaintEffectNoSchedule TaintEffect = "NoSchedule"
+	// Like TaintEffectNoSchedule, but the scheduler tries not to schedule
+	// new pods onto the node, rather than prohibiting new pods from scheduling
+	// onto the node entirely. Enforced by the scheduler.
+	TaintEffectPreferNoSchedule TaintEffect = "PreferNoSchedule"
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
+	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
+	// do not allow pods to start on Kubelet unless they tolerate the taint,
+	// but allow all already-running pods to continue running.
+	// Enforced by the scheduler and Kubelet.
+	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
+	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
+	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
+	// do not allow pods to start on Kubelet unless they tolerate the taint,
+	// and evict any already-running pods that do not tolerate the taint.
+	// Enforced by the scheduler and Kubelet.
+	// TaintEffectNoScheduleNoAdmitNoExecute = "NoScheduleNoAdmitNoExecute"
+)
+
+// The pod this Toleration is attached to tolerates any taint that matches
+// the triple <key,value,effect> using the matching operator <operator>.
+type Toleration struct {
+	// Required. Key is the taint key that the toleration applies to.
+	Key string `json:"key,omitempty" patchStrategy:"merge" patchMergeKey:"key"`
+	// operator represents a key's relationship to the value.
+	// Valid operators are Exists and Equal. Defaults to Equal.
+	// Exists is equivalent to wildcard for value, so that a pod can
+	// tolerate all taints of a particular category.
+	Operator TolerationOperator `json:"operator,omitempty"`
+	// Value is the taint value the toleration matches to.
+	// If the operator is Exists, the value should be empty, otherwise just a regular string.
+	Value string `json:"value,omitempty"`
+	// Effect indicates the taint effect to match. Empty means match all taint effects.
+	// When specified, allowed values are NoSchedule and PreferNoSchedule.
+	Effect TaintEffect `json:"effect,omitempty"`
+	// TODO: For forgiveness (#1574), we'd eventually add at least a grace period
+	// here, and possibly an occurrence threshold and period.
+}
+
+// A toleration operator is the set of operators that can be used in a toleration.
+type TolerationOperator string
+
+const (
+	TolerationOpExists TolerationOperator = "Exists"
+	TolerationOpEqual  TolerationOperator = "Equal"
+)
+
 // PodSpec is a description of a pod
 type PodSpec struct {
 	Volumes []Volume `json:"volumes"`
-	// Required: there must be at least one container in a pod.
+	// List of initialization containers belonging to the pod.
+	InitContainers []Container `json:"-"`
+	// List of containers belonging to the pod.
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
@@ -1416,6 +1491,11 @@ type PodStatus struct {
 	// This is before the Kubelet pulled the container image(s) for the pod.
 	StartTime *unversioned.Time `json:"startTime,omitempty"`
 
+	// The list has one entry per init container in the manifest. The most recent successful
+	// init container will have ready = true, the most recently started container will have
+	// startTime set.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-statuses
+	InitContainerStatuses []ContainerStatus `json:"-"`
 	// The list has one entry per container in the manifest. Each entry is
 	// currently the output of `docker inspect`. This output format is *not*
 	// final and should not be relied upon.
@@ -1889,6 +1969,8 @@ const (
 	// NodeOutOfDisk means the kubelet will not accept new pods due to insufficient free disk
 	// space on the node.
 	NodeOutOfDisk NodeConditionType = "OutOfDisk"
+	// NodeMemoryPressure means the kubelet is under pressure due to insufficient available memory.
+	NodeMemoryPressure NodeConditionType = "MemoryPressure"
 )
 
 type NodeCondition struct {

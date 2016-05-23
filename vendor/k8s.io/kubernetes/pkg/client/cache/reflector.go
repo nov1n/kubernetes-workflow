@@ -292,11 +292,11 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
-	metaInterface, err := meta.Accessor(list)
+	listMetaInterface, err := meta.ListAccessor(list)
 	if err != nil {
-		return fmt.Errorf("%s: Unable to understand list result %#v", r.name, list)
+		return fmt.Errorf("%s: Unable to understand list result %#v: %v", r.name, list, err)
 	}
-	resourceVersion = metaInterface.GetResourceVersion()
+	resourceVersion = listMetaInterface.GetResourceVersion()
 	items, err := meta.ExtractList(list)
 	if err != nil {
 		return fmt.Errorf("%s: Unable to understand list result %#v (%v)", r.name, list, err)
@@ -337,15 +337,22 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
+
 		if err := r.watchHandler(w, &resourceVersion, resyncCh, stopCh); err != nil {
 			if err != errorResyncRequested && err != errorStopRequested {
 				glog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
 			}
-			return nil
+			if err != errorResyncRequested {
+				return nil
+			}
 		}
 		if r.canForceResyncNow() {
 			glog.V(4).Infof("%s: next resync planned for %#v, forcing now", r.name, r.nextResync)
-			return nil
+			if err := r.store.Resync(); err != nil {
+				return err
+			}
+			cleanup()
+			resyncCh, cleanup = r.resyncChan()
 		}
 	}
 }
