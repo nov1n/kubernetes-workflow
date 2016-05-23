@@ -70,7 +70,7 @@ func (w *workflows) Update(workflow *api.Workflow) (result *api.Workflow, err er
 }
 
 func (w *workflows) UpdateStatus(workflow *api.Workflow) (result *api.Workflow, err error) {
-	return w.UpdateWithSubresource(workflow, "status")
+	return w.UpdateWithSubresource(workflow, "")
 }
 
 func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource string) (result *api.Workflow, err error) {
@@ -79,13 +79,13 @@ func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource st
 		nsPath = "/namespaces/" + w.ns
 	}
 	if subresource != "" {
-		// subresource = "/" + subresource
+		subresource = "/" + subresource
 	}
 	if workflow.Name == "" {
 		return nil, fmt.Errorf("no name found in workflow")
 	}
 	// @borismattijssen: TODO replace with path.Join
-	url := w.client.baseURL + nsPath + "/workflows/" + workflow.Name
+	url := w.client.baseURL + nsPath + "/workflows/" + workflow.Name + subresource
 	b, err := json.Marshal(workflow)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't encode workflow: %v", err)
