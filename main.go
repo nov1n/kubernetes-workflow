@@ -70,6 +70,6 @@ func main() {
 
 	manager := workflow.NewWorkflowManager(oldClient, client, thirdPartyClient, k8sController.NoResyncPeriodFunc)
 	stopChan := make(chan struct{})
-	manager.Run(5, stopChan)
+	manager.Run(1, stopChan)
 	<-stopChan
 }

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,8 @@ package workflow
 
 import (
 	"net/http"
+	"reflect"
+	"runtime/debug"
 	"time"
 
 	"github.com/golang/glog"
@@ -25,6 +27,7 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/client/cache"
 	"github.com/nov1n/kubernetes-workflow/pkg/controller"
+	"github.com/nov1n/kubernetes-workflow/pkg/validation"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
@@ -48,6 +51,8 @@ const (
 	workflowUID                    = "workflow-uid"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 )
+
+var goroutine = 1
 
 type WorkflowManager struct {
 	oldKubeClient k8sCl.Interface
@@ -103,6 +108,37 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 		recorder:     eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
 	}
 
+	addEventHandler := func(obj interface{}) {
+		wf := obj.(*api.Workflow)
+
+		wfValid := wc.validateWorkflow(wf)
+		if !wfValid {
+			return
+		}
+
+		glog.V(3).Infof("Enqueuing controller for new workflow %v", wf.Name)
+		wc.enqueueController(wf)
+	}
+
+	updateEventHandler := func(old, cur interface{}) {
+		oldWf := old.(*api.Workflow)
+		curWf := cur.(*api.Workflow)
+		glog.Infof("+++++ RESOURCEV: %v", curWf.ResourceVersion)
+
+		if !reflect.DeepEqual(oldWf, curWf) {
+			glog.V(3).Infof("Update WF old=%v, cur=%v", oldWf, curWf)
+			wfValid := wc.validateWorkflow(curWf)
+			if !wfValid {
+				return
+			}
+		} else {
+			glog.V(3).Infof("Updated workflow %v is the same as the old workflow", curWf)
+		}
+
+		glog.V(3).Infof("Enqueuing controller for updated workflow %v", curWf.Name)
+		wc.enqueueController(curWf)
+	}
+
 	wc.workflowStore.Store, wc.workflowController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
@@ -115,14 +151,8 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 		&api.Workflow{},
 		k8sRepli.FullControllerResyncPeriod,
 		k8sFrwk.ResourceEventHandlerFuncs{
-			AddFunc: wc.enqueueController,
-			UpdateFunc: func(old, cur interface{}) {
-				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
-					// wc.enqueueController(workflow)
-					// fmt.Println("UPDATE")
-				}
-				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
-			},
+			AddFunc:    addEventHandler,
+			UpdateFunc: updateEventHandler,
 			DeleteFunc: wc.enqueueController,
 		},
 	)
@@ -149,6 +179,27 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 	wc.syncHandler = wc.syncWorkflow
 	wc.jobStoreSynced = wc.jobController.HasSynced
 	return wc
+}
+
+// validateWorkflow validates a given workflow and sets its error label accordingly
+func (w *WorkflowManager) validateWorkflow(wf *api.Workflow) (valid bool) {
+	errorLabel := make(map[string]string)
+
+	validationErrs := validation.ValidateWorkflow(wf)
+	if len(validationErrs) > 0 {
+		glog.Errorf("Workflow %v invalid: %v", wf.Name, validationErrs)
+		errorLabel["error"] = "validationError"
+	} else {
+		valid = true
+	}
+
+	w.setLabels(wf, errorLabel)
+	_, err := w.tpClient.Workflows(wf.Namespace).Update(wf)
+	if err != nil {
+		glog.Errorf("Could not update workflow labels for workflow %v", wf.Name)
+	}
+
+	return
 }
 
 // Run the main goroutine responsible for watching and syncing workflows.
@@ -199,6 +250,7 @@ func (w *WorkflowManager) worker() {
 
 func (w *WorkflowManager) syncWorkflow(key string) error {
 	glog.Infoln("Syncing: " + key)
+	glog.Infoln("Q-LEN: %v", w.queue.Len())
 
 	startTime := time.Now()
 	defer func() {
@@ -227,7 +279,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	workflow := *obj.(*api.Workflow)
 	// Set defaults for workflow
 	if _, ok := workflow.Labels[workflowUID]; !ok {
-		newWorkflow, err := w.setLabels(&workflow)
+		newWorkflow, err := w.setUID(&workflow)
 		if err != nil {
 			serr, ok := err.(*k8sApiErr.StatusError)
 			if !ok {
@@ -267,9 +319,10 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// 	}
 
 	// If the workflow is finished we don't have to do anything
-	// if isWorkflowFinished(&workflow) {
-	// 	return nil
-	// }
+	if isWorkflowFinished(&workflow) {
+		glog.V(3).Infof("Workflow %v finished, breaking sync loop", workflow.Name)
+		return nil
+	}
 
 	// If the the deadline has passed we add a condition, set completion time and
 	// fire an event
@@ -321,7 +374,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	return nil
 }
 
-func (w *WorkflowManager) setLabels(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
+func (w *WorkflowManager) setUID(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
 	if workflow.Labels == nil {
 		workflow.Labels = make(map[string]string)
 	}
@@ -336,6 +389,16 @@ func (w *WorkflowManager) setLabels(workflow *api.Workflow) (newWorkflow *api.Wo
 	return
 }
 
+// SetLabels adds the map to the workflow as labels.
+func (w *WorkflowManager) setLabels(workflow *api.Workflow, labels map[string]string) {
+	if workflow.Labels == nil {
+		workflow.Labels = make(map[string]string)
+	}
+	for key, value := range labels {
+		workflow.Labels[key] = value
+	}
+}
+
 // pastActiveDeadline checks if workflow has ActiveDeadlineSeconds field set and if it is exceeded.
 func pastActiveDeadline(workflow *api.Workflow) bool {
 	return false
@@ -347,6 +410,14 @@ func (w *WorkflowManager) updateWorkflowStatus(workflow *api.Workflow) error {
 }
 
 func isWorkflowFinished(w *api.Workflow) bool {
+	for _, c := range w.Status.Conditions {
+		conditionWFFinished := (c.Type == api.WorkflowComplete || c.Type == api.WorkflowFailed)
+		conditionTrue := c.Status == k8sApi.ConditionTrue
+		if conditionWFFinished && conditionTrue {
+			glog.V(3).Infof("Workflow %v finished", w.Name)
+			return true
+		}
+	}
 	return false
 }
 
@@ -362,9 +433,15 @@ func (w *WorkflowManager) enqueueController(obj interface{}) {
 // enqueueAfter enqueues a workflow after a given time.
 // enqueueAfter is non-blocking
 func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
+	debug.PrintStack()
+	glog.Infof("START ENQUEUE AFTER -------")
+
 	go func() {
+		goroutine++
+		glog.Infof("START GOFUNC ENQUEUE AFTER -------")
 		time.Sleep(d)
 		w.enqueueController(obj)
+		glog.Infof("AFTER ENQUEUE CONTROLLER -------")
 	}()
 	return
 }
@@ -423,8 +500,9 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	// 		glog.Errorf("Error creating job: %v\n", err)
 	// 	}
 	// }
-	needsStatusUpdate := false
 	glog.V(3).Infof("manage Workflow -> %v", workflow.Name)
+
+	needsStatusUpdate := false
 	workflowComplete := true
 	for stepName, step := range workflow.Spec.Steps {
 		if stepStatus, ok := workflow.Status.Statuses[stepName]; ok && stepStatus.Complete {

@@ -2,12 +2,15 @@
     "apiVersion": "nerdalize.com/v1alpha1",
     "kind": "Workflow",
     "metadata": {
-        "name": "test-workflow"
+        "name": "workflow-invalid"
     },
     "spec": {
         "activeDeadlineSeconds": 3600,
         "steps": {
             "step-a": {
+		"dependencies": [
+		    "step-a"
+		],
                 "jobTemplate": {
                     "metadata": {
                         "name": "job1"
