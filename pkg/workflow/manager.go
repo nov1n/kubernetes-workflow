@@ -98,9 +98,8 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 		kubeClient:    kubeClient,
 		tpClient:      tpClient,
 		jobControl: controller.WorkflowJobControl{
-			KubeClient:    kubeClient,
-			OldKubeClient: oldClient,
-			Recorder:      eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
+			KubeClient: kubeClient,
+			Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
 		},
 		expectations: k8sCtl.NewControllerExpectations(),
 		queue:        k8sWq.New(),
