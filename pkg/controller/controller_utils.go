@@ -29,6 +29,7 @@ import (
 	k8sClSet "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	k8sRec "k8s.io/kubernetes/pkg/client/record"
 	k8sCtl "k8s.io/kubernetes/pkg/controller"
+	k8sKubectl "k8s.io/kubernetes/pkg/kubectl"
 	k8sLabels "k8s.io/kubernetes/pkg/labels"
 	k8sRunt "k8s.io/kubernetes/pkg/runtime"
 )
@@ -36,8 +37,10 @@ import (
 type JobControlInterface interface {
 	// CreateJob
 	CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, key string) error
+	// DeleteAllJobs
+	DeleteAllJobs(object k8sRunt.Object) (errs []error)
 	// DeleteJob
-	DeleteJob(namespace, name string, object k8sRunt.Object) error
+	DeleteJob(namespace, name string, reaper k8sKubectl.Reaper) error
 }
 
 // RealJobControl is the default implementation of JobControlInterface
@@ -130,8 +133,20 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *k8sBatch.JobTe
 	return nil
 }
 
-func (w WorkflowJobControl) DeleteJob(namespace, jobName string, object k8sRunt.Object) error {
+func (w WorkflowJobControl) DeleteAllJobs(object k8sRunt.Object) (errs []error) {
+	workflow := object.(*api.Workflow)
+	reaper, err := k8sKubectl.ReaperFor(k8sBatch.Kind("Job"), w.KubeClient)
+	if err != nil {
+		return []error{fmt.Errorf("couldn't create reaper for job: %v", err)}
+	}
+	for stepName, step := range workflow.Spec.Steps {
+		errs = append(errs, w.DeleteJob(step.JobTemplate.Namespace, step.JobTemplate.Name, reaper))
+	}
 	return nil
+}
+
+func (w WorkflowJobControl) DeleteJob(namespace, jobName string, reaper k8sKubectl.Reaper) error {
+	return reaper.Stop(namespace, jobName, 0, nil)
 }
 
 type FakeJobControl struct {

@@ -124,7 +124,7 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
 			},
-			DeleteFunc: wc.enqueueController,
+			DeleteFunc: wc.deleteWorkflow,
 		},
 	)
 
@@ -216,6 +216,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// Obtain the workflow object from store by key
 	obj, exists, err := w.workflowStore.Store.GetByKey(key)
 	if !exists {
+
 		glog.V(3).Infof("Workflow has been deleted: %v", key)
 		return nil
 	}
@@ -427,6 +428,27 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 		glog.V(3).Infof("enqueueing controller for %v", job.Name)
 		w.enqueueController(workflow)
 	}
+}
+
+func (m *WorkflowManager) deleteWorkflow(obj interface{}) {
+	// type safety enforced by Informer
+	workflow, ok := obj.(*api.Workflow)
+	if !ok {
+		tombstone, ok := obj.(k8sCache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.Errorf("DeleteWorkflow: Tombstone not found for obj %v", obj)
+			return
+		}
+		glog.V(3).Infof("DeleteWorkflow: Tombstone found %v", tombstone)
+		workflow, ok = tombstone.Obj.(*api.Workflow)
+		if !ok {
+			glog.Errorf("DeleteWorkflow: Tombstone contained object that is not a workflow %+v", tombstone)
+			return
+		}
+		glog.V(3).Infof("DeleteWorkflow: Workflow found in tombstone: %v", workflow)
+	}
+
+	m.jobControl.DeleteAllJobs(workflow)
 }
 
 func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
