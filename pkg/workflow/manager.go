@@ -47,6 +47,7 @@ import (
 const (
 	workflowUID                    = "workflow-uid"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
+	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
 )
 
 type WorkflowManager struct {
@@ -160,7 +161,7 @@ func (w *WorkflowManager) Run(workers int, stopCh <-chan struct{}) {
 		go k8sWait.Until(w.worker, time.Second, stopCh)
 	}
 	<-stopCh
-	glog.Infof("Shutting down Workflow Controller")
+	glog.V(3).Infof("Shutting down Workflow Controller")
 	w.queue.ShutDown()
 }
 
@@ -184,7 +185,7 @@ func (w *WorkflowManager) worker() {
 	for {
 		func() {
 			key, quit := w.queue.Get()
-			glog.Infof("Worker got key from queue: %v\n", key)
+			glog.V(3).Infof("Worker got key from queue: %v\n", key)
 			if quit {
 				return
 			}
@@ -198,7 +199,7 @@ func (w *WorkflowManager) worker() {
 }
 
 func (w *WorkflowManager) syncWorkflow(key string) error {
-	glog.Infoln("Syncing: " + key)
+	glog.V(3).Infoln("Syncing: " + key)
 
 	startTime := time.Now()
 	defer func() {
@@ -207,9 +208,8 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 
 	// Check if the jobStore is synced yet (initialized)
 	if !w.jobStoreSynced() {
-		time.Sleep(100 * time.Millisecond) // @sdminonne: TODO remove hard coded value
-		glog.Infof("Waiting for job controller to sync, requeuing workflow %v", key)
-		w.queue.Add(key)
+		glog.V(3).Infof("Waiting for job controller to sync, requeuing workflow %v", key)
+		w.enqueueKeyAfter(key, requeueJobstoreNotSyncedTime)
 		return nil
 	}
 
@@ -236,7 +236,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 				return nil
 			}
 			if serr.Status().Code == http.StatusConflict {
-				glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+				glog.V(3).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
 				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
 			}
 			return nil
@@ -322,6 +322,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 }
 
 func (w *WorkflowManager) setLabels(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
+	glog.V(3).Infof("Setting labels on wf %v", workflow.Name)
 	if workflow.Labels == nil {
 		workflow.Labels = make(map[string]string)
 	}
@@ -360,11 +361,21 @@ func (w *WorkflowManager) enqueueController(obj interface{}) {
 }
 
 // enqueueAfter enqueues a workflow after a given time.
-// enqueueAfter is non-blocking
+// enqueueAfter is non-blocking.
 func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
 	go func() {
 		time.Sleep(d)
 		w.enqueueController(obj)
+	}()
+	return
+}
+
+// enqueueKeyAfter enqueues a workflow key after a given time.
+// enqueueKeyAfter is non-blocking.
+func (w *WorkflowManager) enqueueKeyAfter(key string, d time.Duration) {
+	go func() {
+		time.Sleep(d)
+		w.queue.Add(key)
 	}()
 	return
 }
@@ -374,6 +385,7 @@ func (w *WorkflowManager) addJob(obj interface{}) {
 	job := obj.(*k8sBatch.Job)
 	glog.V(3).Infof("addJob %v", job.Name)
 	if workflow := w.getJobWorkflow(job); workflow != nil {
+		glog.V(3).Infof("enqueueing controller for %v", job.Name)
 		w.enqueueController(workflow)
 	}
 }
@@ -412,19 +424,14 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 	}
 	glog.V(3).Infof("DeleteJob old=%v", job.Name)
 	if workflow := w.getJobWorkflow(job); workflow != nil {
+		glog.V(3).Infof("enqueueing controller for %v", job.Name)
 		w.enqueueController(workflow)
 	}
 }
 
 func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
-	// for stepName, step := range workflow.Spec.Steps {
-	// 	err := w.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
-	// 	if err != nil {
-	// 		glog.Errorf("Error creating job: %v\n", err)
-	// 	}
-	// }
 	needsStatusUpdate := false
-	glog.V(3).Infof("manage Workflow -> %v", workflow.Name)
+	glog.V(3).Infof("Manage workflow %v", workflow.Name)
 	workflowComplete := true
 	for stepName, step := range workflow.Spec.Steps {
 		if stepStatus, ok := workflow.Status.Statuses[stepName]; ok && stepStatus.Complete {
@@ -440,6 +447,7 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	}
 
 	if workflowComplete {
+		glog.V(3).Infof("Setting workflow complete status for workflow %v", workflow.Name)
 		now := k8sApiUnv.Now()
 		condition := api.WorkflowCondition{
 			Type:               api.WorkflowComplete,
@@ -455,15 +463,18 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	return needsStatusUpdate
 }
 
+// manageWorkflowJob manages a Job that is in a step of a workflow.
 func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
 	for _, dependencyName := range step.Dependencies {
-		if dependencyStatus, ok := workflow.Status.Statuses[dependencyName]; !ok || !dependencyStatus.Complete {
-			glog.V(3).Infof("Dependency %v not satisfied for %v", dependencyName, stepName)
+		dependencyStatus, ok := workflow.Status.Statuses[dependencyName]
+		if !ok || !dependencyStatus.Complete {
 			return false
 		}
 	}
 
 	// all dependencies satisfied (or missing) need action: update or create step
+	glog.V(3).Infof("Dependencies satisfied for %v", stepName)
+
 	key, err := k8sCtl.KeyFunc(workflow)
 	if err != nil {
 		glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)
@@ -478,6 +489,8 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 		return false
 	}
 
+	glog.V(3).Infof("Listing jobs for step %v of wf %v resulted in %d items", stepName, workflow.Name, len(jobList.Items))
+
 	switch len(jobList.Items) {
 	case 0: // create job
 		err := w.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
@@ -491,7 +504,7 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 		job := jobList.Items[0]
 		reference, err := k8sApi.GetReference(&job)
 		if err != nil || reference == nil {
-			glog.Errorf("Unable to get reference from %v: %v", job.Name, err)
+			glog.Errorf("Unable to get reference from job %v in step %v of wf %v: %v", job.Name, stepName, workflow.Name, err)
 			return false
 		}
 		oldStatus := workflow.Status.Statuses[stepName]
@@ -500,9 +513,9 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 			Complete:  jobFinished,
 			Reference: *reference}
 		glog.V(3).Infof("Updated job status from %v to %v for job %v in step %v for wf %v", oldStatus.Complete,
-			workflow.Status.Statuses[stepName].Complete, step.JobTemplate.Name, stepName, workflow.Name)
+			workflow.Status.Statuses[stepName].Complete, job.Name, stepName, workflow.Name)
 	default: // reconciliate
-		glog.Errorf("WorkflowController.manageWorkfloJob %v too many jobs reported. Need reconciliation.", workflow.Name)
+		glog.Errorf("WorkflowController.manageWorkfloJob resulted in too many jobs for wf %v. Need reconciliation.", workflow.Name)
 		return false
 	}
 	return true
