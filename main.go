@@ -25,10 +25,23 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/workflow"
 
+	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	k8sApiExtensions "k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
+)
+
+const (
+	WorkflowKind        = "Workflow"
+	WorkflowResource    = "workflow"
+	WorkflowAPIGroup    = "nerdalize.com"
+	WorkflowAPIVersion  = "v1alpha1"
+	WorkflowAPIVersions = []k8sApiExtensions.APIVersion{
+		"v1alpha1",
+	}
+	WorkflowDescription = "An API endpoint for workflows"
 )
 
 func main() {
@@ -72,4 +85,39 @@ func main() {
 	stopChan := make(chan struct{})
 	manager.Run(5, stopChan)
 	<-stopChan
+}
+
+func registerThirdPartyResource(client k8sClient.Interface) error {
+	opts := k8sApi.ListOptions{
+		TypeMeta: k8sApiUnversioned.TypeMeta{
+			Kind:       WorkflowKind,
+			APIVersion: WorkflowAPIGroup + "/" + WorkflowAPIVersion,
+		},
+	}
+	list, err := client.Extensions().ThirdPartyResources().List(opts)
+	if err != nil {
+		return fmt.Errorf("couldn't do initial list of third party resources: %v", err)
+	}
+
+	switch len(list.Items) {
+	case 1:
+		return nil
+	case 0:
+		config := &k8sApiExtensions.ThirdPartyResource{
+			ObjectMeta: k8sApi.ObjectMeta{
+				Name: WorkflowResource + "." + WorkflowAPIGroup,
+			},
+			Description: WorkflowDescription,
+			Versions:    WorkflowAPIVersions,
+		}
+
+		_, err := client.Extensions().ThirdPartyResources().Create(config)
+		if err != nil {
+			return fmt.Errorf("couldn't create third party resource: %v", err)
+		}
+	default:
+		return fmt.Errorf("found too many items when listing third party resources: %d items found", len(list.Items))
+	}
+
+	return nil
 }
