@@ -17,6 +17,7 @@ limitations under the License.
 package workflow
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 	k8sCtl "k8s.io/kubernetes/pkg/controller"
 	k8sFrwk "k8s.io/kubernetes/pkg/controller/framework"
 	k8sRepli "k8s.io/kubernetes/pkg/controller/replication"
+	k8sKubectl "k8s.io/kubernetes/pkg/kubectl"
 	k8sRunt "k8s.io/kubernetes/pkg/runtime"
 	k8sUtRunt "k8s.io/kubernetes/pkg/util/runtime"
 	k8sWait "k8s.io/kubernetes/pkg/util/wait"
@@ -124,7 +126,7 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
 			},
-			DeleteFunc: wc.enqueueController,
+			DeleteFunc: wc.deleteWorkflow,
 		},
 	)
 
@@ -216,6 +218,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// Obtain the workflow object from store by key
 	obj, exists, err := w.workflowStore.Store.GetByKey(key)
 	if !exists {
+
 		glog.V(3).Infof("Workflow has been deleted: %v", key)
 		return nil
 	}
@@ -427,6 +430,57 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 		glog.V(3).Infof("enqueueing controller for %v", job.Name)
 		w.enqueueController(workflow)
 	}
+}
+
+func (m *WorkflowManager) deleteWorkflow(obj interface{}) {
+	// type safety enforced by Informer
+	workflow, ok := obj.(*api.Workflow)
+	if !ok {
+		tombstone, ok := obj.(k8sCache.DeletedFinalStateUnknown)
+		if !ok {
+			glog.Errorf("DeleteWorkflow: Tombstone not found for obj %v", obj)
+			return
+		}
+		glog.V(3).Infof("DeleteWorkflow: Tombstone found %v", tombstone)
+		workflow, ok = tombstone.Obj.(*api.Workflow)
+		if !ok {
+			glog.Errorf("DeleteWorkflow: Tombstone contained object that is not a workflow %+v", tombstone)
+			return
+		}
+		glog.V(3).Infof("DeleteWorkflow: Workflow found in tombstone: %v", workflow)
+	}
+
+	errs := m.deleteAllJobs(workflow)
+	if len(errs) > 0 {
+		glog.Errorf("Deleting all jobs on workflow %v returned the following errors: %v", workflow.Name, errs)
+		return
+	}
+	glog.V(3).Infof("Deleted all jobs on workflow %v succesfully.", workflow.Name)
+}
+
+func (m *WorkflowManager) getAllJobs(workflow *api.Workflow) (jobs k8sBatch.JobList, err error) {
+	selector, err := k8sApiUnv.LabelSelectorAsSelector(workflow.Spec.JobsSelector)
+	if err != nil {
+		return k8sBatch.JobList{}, fmt.Errorf("Could not convert workflow jobsSelector to k8sApiUnv.Selector for workflow %v", workflow.Name)
+	}
+	return m.jobStore.Jobs(workflow.Namespace).List(selector)
+}
+
+func (m *WorkflowManager) deleteAllJobs(workflow *api.Workflow) (errs []error) {
+	reaper, err := k8sKubectl.ReaperFor(k8sBatch.Kind("Job"), m.oldKubeClient)
+	if err != nil {
+		return []error{fmt.Errorf("couldn't create job reaper: %v", err)}
+	}
+	glog.V(3).Infof("Deleting all jobs for workflow %v", workflow.Name)
+	jobs, err := m.getAllJobs(workflow)
+	if err != nil {
+		return []error{fmt.Errorf("couldn't list jobs: %v", err)}
+	}
+	for _, job := range jobs.Items {
+		glog.V(3).Infof("Deleting job %v/%v for workflow %v", job.Namespace, job.Name, workflow.Name)
+		errs = append(errs, reaper.Stop(job.Namespace, job.Name, 0, nil))
+	}
+	return
 }
 
 func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
