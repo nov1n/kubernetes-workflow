@@ -33,6 +33,7 @@ type StoreToWorkflowLister struct {
 	k8sCache.Store
 }
 
+// Exists checks if the store contains a particular workflow
 func (s *StoreToWorkflowLister) Exists(workflow *api.Workflow) (bool, error) {
 	_, exists, err := s.Store.Get(workflow)
 	if err != nil {
@@ -41,7 +42,7 @@ func (s *StoreToWorkflowLister) Exists(workflow *api.Workflow) (bool, error) {
 	return exists, nil
 }
 
-// StoreToWorkflowLister lists all workflows in the store.
+// List lists all workflows in the store.
 func (s *StoreToWorkflowLister) List() (workflows api.WorkflowList, err error) {
 	for _, c := range s.Store.List() {
 		workflows.Items = append(workflows.Items, *(c.(*api.Workflow)))
@@ -49,7 +50,7 @@ func (s *StoreToWorkflowLister) List() (workflows api.WorkflowList, err error) {
 	return workflows, nil
 }
 
-// GetJobWorkflow
+// GetJobWorkflows returns the workflows for a given job
 func (s *StoreToWorkflowLister) GetJobWorkflows(job *k8sBatch.Job) (workflows []api.Workflow, err error) {
 	var selector k8sLabels.Selector
 	var workflow api.Workflow
@@ -76,7 +77,8 @@ func (s *StoreToWorkflowLister) GetJobWorkflows(job *k8sBatch.Job) (workflows []
 	return
 }
 
-// StoreToJobLister gives a store List and Exists methods. The store must contain only Jobs.
+// StoreToJobLister gives a store List and Exists methods.
+// The store must contain only Jobs.
 type StoreToJobLister struct {
 	k8sCache.Store
 }
@@ -90,7 +92,7 @@ func (s *StoreToJobLister) Exists(job *k8sBatch.Job) (bool, error) {
 	return exists, nil
 }
 
-// StoreToJobLister lists all jobs in the store.
+// List lists all jobs in the store.
 func (s *StoreToJobLister) List() (jobs k8sBatch.JobList, err error) {
 	for _, c := range s.Store.List() {
 		jobs.Items = append(jobs.Items, *(c.(*k8sBatch.Job)))
@@ -108,7 +110,7 @@ type storeJobsNamespacer struct {
 	namespace string
 }
 
-// List returns a list of jobs fromt he store
+// List returns a list of jobs from the store matching the selector
 func (s storeJobsNamespacer) List(selector k8sLabels.Selector) (jobs k8sBatch.JobList, err error) {
 	list := k8sBatch.JobList{}
 	for _, m := range s.store.List() {
