@@ -87,7 +87,8 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 			AddFunc: wc.enqueueWorkflow,
 			UpdateFunc: func(old, cur interface{}) {
 				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
-					wc.enqueueWorkflow(workflow)
+					// TODO: This should be uncommented. For now keep it this way to be consistent with master.
+					// wc.enqueueWorkflow(workflow)
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
 			},
