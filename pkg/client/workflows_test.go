@@ -32,6 +32,7 @@ import (
 	k8sTypes "k8s.io/kubernetes/pkg/types"
 )
 
+// Example response from the server when querying all workflows
 const jsonList = `{"kind": "WorkflowList","items": [
 {
   "apiVersion": "nerdalize.com/v1alpha1",
@@ -111,6 +112,8 @@ const jsonList = `{"kind": "WorkflowList","items": [
 }
 ]}`
 
+// getclient returns a ThirdPartyClient that always returns the given output string as a response
+// to a request
 func getClient(output string) (tpc *ThirdPartyClient, err error) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, output)
@@ -124,6 +127,7 @@ func getClient(output string) (tpc *ThirdPartyClient, err error) {
 	return
 }
 
+// Test list tests whether the json corresponds to the struct structure defined in api/types.go
 func TestList(t *testing.T) {
 	expected := api.WorkflowList{
 		TypeMeta: k8sApiUnv.TypeMeta{

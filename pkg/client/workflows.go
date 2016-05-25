@@ -59,7 +59,7 @@ type workflows struct {
 	nameMap map[string]api.Workflow
 }
 
-// newPods returns a pods
+// newWorkflows returns a new workflows object given a client and a namespace
 func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
 	return &workflows{
 		client:  c,
@@ -68,14 +68,18 @@ func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
 	}
 }
 
+// Update updates the given workflow in the cluster
 func (w *workflows) Update(workflow *api.Workflow) (result *api.Workflow, err error) {
 	return w.UpdateWithSubresource(workflow, "")
 }
 
+// UpdateStatus updates the status field for a given workflow TODO: Is this correct?
 func (w *workflows) UpdateStatus(workflow *api.Workflow) (result *api.Workflow, err error) {
 	return w.UpdateWithSubresource(workflow, "")
 }
 
+// UpdateWithSubresource updates a given workflows subresource by communicating with the kubernetes
+// API server through the client
 func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource string) (result *api.Workflow, err error) {
 	nsPath := ""
 	if w.ns != "" {
@@ -120,6 +124,7 @@ func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource st
 	return
 }
 
+// List lists returns a WorkflowList containing all workflows in the workflows namespace
 func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
 	nsPath := ""
 	if w.ns != "" {
