@@ -14,9 +14,10 @@ godep go vet $(go list ./... | grep -v '/vendor/' | grep '/nov1n/') || ERROR="Er
 printf "\n\nGO TEST:\n"
 godep go test $(go list ./... | grep -v '/vendor/' | grep '/nov1n/') || ERROR="Error testing all packages"
 
+# Create bin directory if non existent
 [ -d ./bin ] || mkdir bin
 
-#Build main binary
+# Build main binary
 printf "\n\nBUILDING BINARY:\n"
 godep go build -o bin/workflow || ERROR="Build error"
 
@@ -43,6 +44,7 @@ do
     printf "\n"
 done
 
+# Exit non zero in case of error
 if [ ! -z "$ERROR" ]
 then
     die "Encountered error, last error was: $ERROR"
