@@ -127,8 +127,9 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *k8sBatch.JobTe
 	if err := k8sApi.Scheme.Convert(&template.Spec, &job.Spec); err != nil {
 		return fmt.Errorf("unable to convert job template: %v", err)
 	}
-
-	if newJob, err := w.KubeClient.Batch().Jobs(namespace).Create(job); err != nil {
+	
+	newJob, err := w.KubeClient.Batch().Jobs(namespace).Create(job)
+	if err != nil {
 		w.Recorder.Eventf(object, k8sApi.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create job: %v", err)
 	}
