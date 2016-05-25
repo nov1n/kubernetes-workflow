@@ -18,8 +18,6 @@ package workflow
 
 import (
 	"net/http"
-	"reflect"
-	"runtime/debug"
 	"time"
 
 	"github.com/golang/glog"
@@ -52,8 +50,6 @@ const (
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 )
 
-var goroutine = 1
-
 type WorkflowManager struct {
 	oldKubeClient k8sCl.Interface
 	kubeClient    k8sClSet.Interface
@@ -65,7 +61,7 @@ type WorkflowManager struct {
 	updateHandler func(workflow *api.Workflow) error
 	syncHandler   func(workflowKey string) error
 
-	// jobStoreSynced returns true if the jod store has been synced at least once.
+	// jobStoreSynced returns true if the job store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	jobStoreSynced func() bool
 
@@ -121,22 +117,24 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 	}
 
 	updateEventHandler := func(old, cur interface{}) {
+		// if !reflect.DeepEqual(oldWfCopy, curWfCopy) {
+		// 	glog.V(3).Infof("Update WF old=%v, cur=%v", oldWf, curWf)
+		// 	wfValid := wc.validateWorkflow(curWf)
+		// 	if !wfValid {
+		// 		return
+		// 	}
+		// 	glog.V(3).Infof("Enqueuing controller for updated workflow %v", curWf.Name)
+		// 	wc.enqueueController(curWf)
+		// } else {
+		// 	glog.V(3).Infof("Updated workflow %v is the same as the old workflow", curWf)
+		// }
+
 		oldWf := old.(*api.Workflow)
 		curWf := cur.(*api.Workflow)
-		glog.Infof("+++++ RESOURCEV: %v", curWf.ResourceVersion)
-
-		if !reflect.DeepEqual(oldWf, curWf) {
-			glog.V(3).Infof("Update WF old=%v, cur=%v", oldWf, curWf)
-			wfValid := wc.validateWorkflow(curWf)
-			if !wfValid {
-				return
-			}
-		} else {
-			glog.V(3).Infof("Updated workflow %v is the same as the old workflow", curWf)
+		if wf := cur.(*api.Workflow); !isWorkflowFinished(wf) {
+			glog.V(3).Infof("Enqueuing updated WF old=%v, cur=%v", oldWf.ResourceVersion, curWf.ResourceVersion)
+			wc.enqueueController(wf)
 		}
-
-		glog.V(3).Infof("Enqueuing controller for updated workflow %v", curWf.Name)
-		wc.enqueueController(curWf)
 	}
 
 	wc.workflowStore.Store, wc.workflowController = k8sFrwk.NewInformer(
@@ -194,10 +192,10 @@ func (w *WorkflowManager) validateWorkflow(wf *api.Workflow) (valid bool) {
 	}
 
 	w.setLabels(wf, errorLabel)
-	_, err := w.tpClient.Workflows(wf.Namespace).Update(wf)
-	if err != nil {
-		glog.Errorf("Could not update workflow labels for workflow %v", wf.Name)
-	}
+	// _, err := w.tpClient.Workflows(wf.Namespace).Update(wf)
+	// if err != nil {
+	// glog.Errorf("Could not update workflow labels for workflow %v", wf.Name)
+	// }
 
 	return
 }
@@ -249,8 +247,6 @@ func (w *WorkflowManager) worker() {
 }
 
 func (w *WorkflowManager) syncWorkflow(key string) error {
-	glog.Infoln("Syncing: " + key)
-	glog.Infoln("Q-LEN: %v", w.queue.Len())
 
 	startTime := time.Now()
 	defer func() {
@@ -433,15 +429,10 @@ func (w *WorkflowManager) enqueueController(obj interface{}) {
 // enqueueAfter enqueues a workflow after a given time.
 // enqueueAfter is non-blocking
 func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
-	debug.PrintStack()
-	glog.Infof("START ENQUEUE AFTER -------")
 
 	go func() {
-		goroutine++
-		glog.Infof("START GOFUNC ENQUEUE AFTER -------")
 		time.Sleep(d)
 		w.enqueueController(obj)
-		glog.Infof("AFTER ENQUEUE CONTROLLER -------")
 	}()
 	return
 }

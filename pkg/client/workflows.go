@@ -139,7 +139,7 @@ func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err
 // Watch returns a watch.Interface that watches the requested workflows.
 func (w *workflows) Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error) {
 	watcher := watch.NewThirdPartyWatcher()
-	ticker := time.NewTicker(time.Millisecond * 10000)
+	ticker := time.NewTicker(time.Millisecond * 100)
 	go func() {
 		for range ticker.C {
 			list, err := w.List(opts)
