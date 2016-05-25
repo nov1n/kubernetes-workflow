@@ -38,6 +38,7 @@ func ValidateWorkflow(workflow *api.Workflow) k8sField.ErrorList {
 	return allErrs
 }
 
+// ValidateWorkflowSpec validates a WorkflowSpec returning errors in case it is invalid
 func ValidateWorkflowSpec(spec *api.WorkflowSpec, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
 
@@ -53,6 +54,7 @@ func ValidateWorkflowSpec(spec *api.WorkflowSpec, fieldPath *k8sField.Path) k8sF
 	return allErrs
 }
 
+// topologicalSort sorts a map of WorkflowSteps to check for cyclicity
 func topologicalSort(steps map[string]api.WorkflowStep, fieldPath *k8sField.Path) ([]string, *k8sField.Error) {
 	sorted := make([]string, len(steps))
 	temporary := map[string]bool{}
@@ -112,6 +114,7 @@ func topologicalSort(steps map[string]api.WorkflowStep, fieldPath *k8sField.Path
 	return sorted, nil
 }
 
+// ValidateWorkflowSteps validates the steps in a workflow returning errors in case it is invalid
 func ValidateWorkflowSteps(steps map[string]api.WorkflowStep, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
 	if _, err := topologicalSort(steps, fieldPath); err != nil {
@@ -125,6 +128,7 @@ func ValidateWorkflowSteps(steps map[string]api.WorkflowStep, fieldPath *k8sFiel
 	return allErrs
 }
 
+// ValidateWorkflowStatus validates the status of a workflow returning errors in case it is invalid
 func ValidateWorkflowStatus(status *api.WorkflowStatus, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
 
@@ -135,6 +139,8 @@ func ValidateWorkflowStatus(status *api.WorkflowStatus, fieldPath *k8sField.Path
 	return allErrs
 }
 
+// getWorkflowRunningAndCompletedSteps returns two maps, one containing the running steps,
+// the other containing the completed steps in a workflow
 func getWorkflowRunningAndCompletedSteps(workflow *api.Workflow) (running, completed map[string]bool) {
 	running = make(map[string]bool)
 	completed = make(map[string]bool)
@@ -153,6 +159,8 @@ func getWorkflowRunningAndCompletedSteps(workflow *api.Workflow) (running, compl
 	return
 }
 
+// ValidateWorkflowUpdate validates a workflow update checking if it should be allowed
+// It returns a list of errors in case validation fails
 func ValidateWorkflowUpdate(workflow, oldWorkflow *api.Workflow) k8sField.ErrorList {
 	allErrs := k8sValidation.ValidateObjectMetaUpdate(&workflow.ObjectMeta, &oldWorkflow.ObjectMeta, k8sField.NewPath("metadata"))
 
@@ -174,6 +182,8 @@ func ValidateWorkflowUpdate(workflow, oldWorkflow *api.Workflow) k8sField.ErrorL
 	return allErrs
 }
 
+// ValidateWorkflowSpecUpdate validates a spec update checking if it should be allowed
+// It returns a list of errors in case validation fails
 func ValidateWorkflowSpecUpdate(spec, oldSpec *api.WorkflowSpec, running, completed map[string]bool, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
 	allErrs = append(allErrs, ValidateWorkflowSpec(spec, fieldPath)...)
@@ -213,6 +223,8 @@ func ValidateWorkflowSpecUpdate(spec, oldSpec *api.WorkflowSpec, running, comple
 	return allErrs
 }
 
+// ValidateWorkflowStatusUpdate validates a spec update checking if it should be allowed
+// It returns a list of errors in case validation fails
 func ValidateWorkflowStatusUpdate(status, oldStatus *api.WorkflowStatus, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}
 	allErrs = append(allErrs, ValidateWorkflowStatus(status, fieldPath)...)
