@@ -38,7 +38,7 @@ import (
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
-type WorkflowManager struct {
+type Manager struct {
 	oldKubeClient k8sCl.Interface
 	kubeClient    k8sClSet.Interface
 	tpClient      *client.ThirdPartyClient
@@ -64,59 +64,59 @@ type WorkflowManager struct {
 	transitioner *Transitioner
 }
 
-func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClient *client.ThirdPartyClient, resyncPeriod k8sCtl.ResyncPeriodFunc) *WorkflowManager {
-	wc := &WorkflowManager{
+func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClient *client.ThirdPartyClient, resyncPeriod k8sCtl.ResyncPeriodFunc) *Manager {
+	m := &Manager{
 		oldKubeClient: oldClient,
 		kubeClient:    kubeClient,
 		tpClient:      tpClient,
 		queue:         k8sWq.New(),
 	}
 
-	wc.workflowStore.Store, wc.workflowController = k8sFrwk.NewInformer(
+	m.workflowStore.Store, m.workflowController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
-				return wc.tpClient.Workflows(k8sApi.NamespaceAll).List(options)
+				return m.tpClient.Workflows(k8sApi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options k8sApi.ListOptions) (k8sWatch.Interface, error) {
-				return wc.tpClient.Workflows(k8sApi.NamespaceAll).Watch(options)
+				return m.tpClient.Workflows(k8sApi.NamespaceAll).Watch(options)
 			},
 		},
 		&api.Workflow{},
 		k8sRepli.FullControllerResyncPeriod,
 		k8sFrwk.ResourceEventHandlerFuncs{
-			AddFunc: wc.enqueueWorkflow,
+			AddFunc: m.enqueueWorkflow,
 			UpdateFunc: func(old, cur interface{}) {
 				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
 					// TODO: This should be uncommented. For now keep it this way to be consistent with master.
-					// wc.enqueueWorkflow(workflow)
+					// m.enqueueWorkflow(workflow)
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
 			},
-			DeleteFunc: wc.enqueueWorkflow,
+			DeleteFunc: m.enqueueWorkflow,
 		},
 	)
 
-	wc.jobStore.Store, wc.jobController = k8sFrwk.NewInformer(
+	m.jobStore.Store, m.jobController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
-				return wc.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).List(options)
+				return m.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options k8sApi.ListOptions) (k8sWatch.Interface, error) {
-				return wc.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).Watch(options)
+				return m.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).Watch(options)
 			},
 		},
 		&k8sBatch.Job{},
 		k8sRepli.FullControllerResyncPeriod,
 		k8sFrwk.ResourceEventHandlerFuncs{
-			AddFunc:    wc.addJob,
-			UpdateFunc: wc.updateJob,
-			DeleteFunc: wc.deleteJob,
+			AddFunc:    m.addJob,
+			UpdateFunc: m.updateJob,
+			DeleteFunc: m.deleteJob,
 		},
 	)
 
-	wc.transitioner = NewTransitioner(tpClient, kubeClient, wc.jobController.HasSynced, &wc.workflowStore, &wc.jobStore)
-	wc.jobStoreSynced = wc.jobController.HasSynced
-	return wc
+	m.transitioner = NewTransitioner(tpClient, kubeClient, m.jobController.HasSynced, &m.workflowStore, &m.jobStore)
+	m.jobStoreSynced = m.jobController.HasSynced
+	return m
 }
 
 func isWorkflowFinished(w *api.Workflow) bool {
@@ -124,66 +124,66 @@ func isWorkflowFinished(w *api.Workflow) bool {
 }
 
 // Run the main goroutine responsible for watching and syncing workflows.
-func (w *WorkflowManager) Run(workers int, stopCh <-chan struct{}) {
+func (m *Manager) Run(workers int, stopCh <-chan struct{}) {
 	defer k8sUtRunt.HandleCrash()
-	go w.workflowController.Run(stopCh)
-	go w.jobController.Run(stopCh)
+	go m.workflowController.Run(stopCh)
+	go m.jobController.Run(stopCh)
 	for i := 0; i < workers; i++ {
-		go k8sWait.Until(w.worker, time.Second, stopCh)
+		go k8sWait.Until(m.worker, time.Second, stopCh)
 	}
 	<-stopCh
 	glog.V(3).Infof("Shutting down Workflow Controller")
-	w.queue.ShutDown()
+	m.queue.ShutDown()
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (w *WorkflowManager) worker() {
+func (m *Manager) worker() {
 	for {
 		func() {
-			key, quit := w.queue.Get()
+			key, quit := m.queue.Get()
 			glog.V(3).Infof("Worker got key from queue: %v\n", key)
 			if quit {
 				return
 			}
-			defer w.queue.Done(key)
-			requeue, requeueAfter, err := w.transitioner.Transition(key.(string))
+			defer m.queue.Done(key)
+			requeue, requeueAfter, err := m.transitioner.Transition(key.(string))
 			if err != nil {
 				glog.Errorf("Error syncing workflow: %v", err)
 			}
 			if requeue {
-				w.enqueueAfter(key.(string), requeueAfter)
+				m.enqueueAfter(key.(string), requeueAfter)
 			}
 		}()
 	}
 }
 
-func (w *WorkflowManager) enqueueWorkflow(obj interface{}) {
+func (m *Manager) enqueueWorkflow(obj interface{}) {
 	key, err := k8sCtl.KeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
-	w.queue.Add(key)
+	m.queue.Add(key)
 }
 
 // enqueueAfter enqueues a workflow after a given time.
 // enqueueAfter is non-blocking.
-func (w *WorkflowManager) enqueueAfter(key string, d time.Duration) {
+func (m *Manager) enqueueAfter(key string, d time.Duration) {
 	if d > 0 {
 		go func() {
 			time.Sleep(d)
-			w.queue.Add(key)
+			m.queue.Add(key)
 		}()
 	} else {
-		w.queue.Add(key)
+		m.queue.Add(key)
 	}
 	return
 }
 
 // getJobWorkflow return the workflow managing the given job
-func (w *WorkflowManager) getJobWorkflow(job *k8sBatch.Job) *api.Workflow {
-	workflows, err := w.workflowStore.GetJobWorkflows(job)
+func (m *Manager) getJobWorkflow(job *k8sBatch.Job) *api.Workflow {
+	workflows, err := m.workflowStore.GetJobWorkflows(job)
 	if err != nil {
 		glog.V(3).Infof("No workflows found for job %v: %v", job.Name, err)
 		return nil
@@ -195,17 +195,17 @@ func (w *WorkflowManager) getJobWorkflow(job *k8sBatch.Job) *api.Workflow {
 	return &workflows[0]
 }
 
-func (w *WorkflowManager) addJob(obj interface{}) {
+func (m *Manager) addJob(obj interface{}) {
 	// type safety enforced by Informer
 	job := obj.(*k8sBatch.Job)
 	glog.V(3).Infof("addJob %v", job.Name)
-	if workflow := w.getJobWorkflow(job); workflow != nil {
+	if workflow := m.getJobWorkflow(job); workflow != nil {
 		glog.V(3).Infof("enqueueing controller for %v", job.Name)
-		w.enqueueWorkflow(workflow)
+		m.enqueueWorkflow(workflow)
 	}
 }
 
-func (w *WorkflowManager) updateJob(old, cur interface{}) {
+func (m *Manager) updateJob(old, cur interface{}) {
 	// type safety enforced by Informer
 	oldJob := old.(*k8sBatch.Job)
 	curJob := cur.(*k8sBatch.Job)
@@ -214,13 +214,13 @@ func (w *WorkflowManager) updateJob(old, cur interface{}) {
 		glog.V(3).Infof("\t nothing to update")
 		return
 	}
-	if workflow := w.getJobWorkflow(curJob); workflow != nil {
+	if workflow := m.getJobWorkflow(curJob); workflow != nil {
 		glog.V(3).Infof("enqueueing controller for %v", curJob.Name)
-		w.enqueueWorkflow(workflow)
+		m.enqueueWorkflow(workflow)
 	}
 }
 
-func (w *WorkflowManager) deleteJob(obj interface{}) {
+func (m *Manager) deleteJob(obj interface{}) {
 	// type safety enforced by Informer
 	job, ok := obj.(*k8sBatch.Job)
 	if !ok {
@@ -238,8 +238,8 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 		glog.V(3).Infof("DeleteJob: Job found in tombstone: %v", job)
 	}
 	glog.V(3).Infof("DeleteJob old=%v", job.Name)
-	if workflow := w.getJobWorkflow(job); workflow != nil {
+	if workflow := m.getJobWorkflow(job); workflow != nil {
 		glog.V(3).Infof("enqueueing controller for %v", job.Name)
-		w.enqueueWorkflow(workflow)
+		m.enqueueWorkflow(workflow)
 	}
 }
