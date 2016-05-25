@@ -39,13 +39,12 @@ type JobControlInterface interface {
 	DeleteJob(namespace, name string, object k8sRunt.Object) error
 }
 
-// WorkflowJobControl is the default implementation of JobControlInterface
+// WorkflowJobControl is the workflow implementation of JobControlInterface
 type WorkflowJobControl struct {
 	KubeClient k8sClSet.Interface
 	Recorder   k8sRec.EventRecorder
 }
 
-// TODO: What is this?
 var _ JobControlInterface = &WorkflowJobControl{}
 
 // getJobsPrefix returns the prefix used for controller names
@@ -127,7 +126,7 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *k8sBatch.JobTe
 	if err := k8sApi.Scheme.Convert(&template.Spec, &job.Spec); err != nil {
 		return fmt.Errorf("unable to convert job template: %v", err)
 	}
-	
+
 	newJob, err := w.KubeClient.Batch().Jobs(namespace).Create(job)
 	if err != nil {
 		w.Recorder.Eventf(object, k8sApi.EventTypeWarning, "FailedCreate", "Error creating: %v", err)

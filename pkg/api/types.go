@@ -59,7 +59,7 @@ type WorkflowSpec struct {
 	// Steps maps step names to WorkflowStep objects for O(1) access by name
 	Steps map[string]WorkflowStep `json:"steps,omitempty"`
 
-	// Selector for created jobs
+	// Selector for jobs that belong to the Workflow
 	JobsSelector *k8sApiUnv.LabelSelector `json:"jobsSelector,omitempty"`
 }
 

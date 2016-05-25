@@ -223,7 +223,7 @@ func ValidateWorkflowSpecUpdate(spec, oldSpec *api.WorkflowSpec, running, comple
 	return allErrs
 }
 
-// ValidateWorkflowStatusUpdate validates a spec update checking if it should be allowed
+// ValidateWorkflowStatusUpdate validates a status update checking if it should be allowed
 // It returns a list of errors in case validation fails
 func ValidateWorkflowStatusUpdate(status, oldStatus *api.WorkflowStatus, fieldPath *k8sField.Path) k8sField.ErrorList {
 	allErrs := k8sField.ErrorList{}

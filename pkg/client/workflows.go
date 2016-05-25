@@ -124,7 +124,7 @@ func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource st
 	return
 }
 
-// List lists returns a WorkflowList containing all workflows in the workflows namespace
+// List returns a WorkflowList containing all workflows in the workflows namespace
 func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
 	nsPath := ""
 	if w.ns != "" {

@@ -28,7 +28,7 @@ import (
 	k8sLabels "k8s.io/kubernetes/pkg/labels"
 )
 
-// StoreToWorkflowLister gives a store List and Exists methods. The store must contain only Workflows.
+// StoreToWorkflowLister adds List and Exists methods to a Store. The store must contain only Workflows.
 type StoreToWorkflowLister struct {
 	k8sCache.Store
 }
