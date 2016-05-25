@@ -499,6 +499,9 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 			defer k8sUtRunt.HandleError(err)
 		} else {
 			glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
+
+			// Enqueue workflow such that its status will be updated in the next case statement
+			w.enqueueController(workflow)
 		}
 	case 1: // update status
 		job := jobList.Items[0]
