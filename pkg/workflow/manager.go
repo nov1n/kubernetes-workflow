@@ -30,7 +30,6 @@ import (
 	k8sCl "k8s.io/kubernetes/pkg/client/unversioned"
 	k8sCtl "k8s.io/kubernetes/pkg/controller"
 	k8sFrwk "k8s.io/kubernetes/pkg/controller/framework"
-	k8sRepli "k8s.io/kubernetes/pkg/controller/replication"
 	k8sRunt "k8s.io/kubernetes/pkg/runtime"
 	k8sUtRunt "k8s.io/kubernetes/pkg/util/runtime"
 	k8sWait "k8s.io/kubernetes/pkg/util/wait"
@@ -38,6 +37,16 @@ import (
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	// FullResyncPeriod is the time it takes for the job store and workflow store
+	// to be resynced. When the stores are resynced all items in it will be
+	// requeued in Manager.queue by the controller in the informer.
+	FullResyncPeriod = 10 * time.Minute
+)
+
+// Manager is responsible for managing all workflows in the system.
+// Manager has a finite amount of workers which pick workflows waiting to be
+// processed from a queue and hands them over to the Transitioner.
 type Manager struct {
 	oldKubeClient k8sCl.Interface
 	kubeClient    k8sClSet.Interface
@@ -64,6 +73,10 @@ type Manager struct {
 	transitioner *Transitioner
 }
 
+// NewManager creates a new Manager and returns it.
+// NewManager creates two Informers to sync the upstream job store and the upstream
+// workflow store with a downstream job store and a downstream workflow store.
+// NewManager also creates a Transitioner which is used for transitioning workflows.
 func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClient *client.ThirdPartyClient, resyncPeriod k8sCtl.ResyncPeriodFunc) *Manager {
 	m := &Manager{
 		oldKubeClient: oldClient,
@@ -72,6 +85,8 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 		queue:         k8sWq.New(),
 	}
 
+	// Create a new Informer to sync the upstream workflow store with
+	// our downstream workflow store.
 	m.workflowStore.Store, m.workflowController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
@@ -82,7 +97,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 			},
 		},
 		&api.Workflow{},
-		k8sRepli.FullControllerResyncPeriod,
+		FullResyncPeriod,
 		k8sFrwk.ResourceEventHandlerFuncs{
 			AddFunc: m.enqueueWorkflow,
 			UpdateFunc: func(old, cur interface{}) {
@@ -96,6 +111,8 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 		},
 	)
 
+	// Create a new Informer to sync the upstream job store with
+	// our downstream job store.
 	m.jobStore.Store, m.jobController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
@@ -106,7 +123,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 			},
 		},
 		&k8sBatch.Job{},
-		k8sRepli.FullControllerResyncPeriod,
+		FullResyncPeriod,
 		k8sFrwk.ResourceEventHandlerFuncs{
 			AddFunc:    m.addJob,
 			UpdateFunc: m.updateJob,

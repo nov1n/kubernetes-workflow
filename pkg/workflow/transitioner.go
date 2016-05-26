@@ -26,8 +26,13 @@ const (
 	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
 )
 
+// Transitioner is responsible for transitioning a workflow from its current
+// state to a desired state.
 type Transitioner struct {
-	tpClient   *client.ThirdPartyClient
+	// tpClient is a client for accessing ThirdParty resources.
+	tpClient *client.ThirdPartyClient
+
+	// jobControl can be used to Create and Delete jobs in the upstream store.
 	jobControl controller.JobControlInterface
 
 	// jobStoreSynced returns true if the jod store has been synced at least once.
@@ -65,6 +70,8 @@ func NewTransitioner(tpClient *client.ThirdPartyClient, kubeClient k8sClSet.Inte
 	}
 }
 
+// Transition transitions a workflow from its current state to a desired state.
+// It's given a key created by k8sController.KeyFunc.
 func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.Duration, err error) {
 	glog.V(3).Infoln("Syncing: " + key)
 
@@ -136,6 +143,8 @@ func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.D
 }
 
 // TODO: We might want to move this to another file. Maybe utils?
+// setLabels sets the UID label and jobsSelector on a workflow and updates the
+// workflow to the upstream store.
 func (t *Transitioner) setLabels(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
 	glog.V(3).Infof("Setting labels on wf %v", workflow.Name)
 	if workflow.Labels == nil {
@@ -157,6 +166,7 @@ func pastActiveDeadline(workflow *api.Workflow) bool {
 	return false
 }
 
+// updateWorkflow updates a workflow to the upstream store.
 func (t *Transitioner) updateWorkflow(workflow *api.Workflow) error {
 	_, err := t.tpClient.Workflows(workflow.Namespace).Update(workflow)
 	return err
@@ -197,8 +207,8 @@ func (t *Transitioner) manageWorkflow(workflow *api.Workflow) bool {
 }
 
 // TODO: I think this method should return an error (instead of logging the error).
-//       hen an error is returned we probably want to requeue the workflow.
-// manageWorkflowJob manages a Job that is in a step of a workflot.
+//       when an error is returned we probably want to requeue the workflow.
+// manageWorkflowJob manages a Job that is in a step of a workflow.
 func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
 	for _, dependencyName := range step.Dependencies {
 		dependencyStatus, ok := workflow.Status.Statuses[dependencyName]
