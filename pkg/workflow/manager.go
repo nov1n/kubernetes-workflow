@@ -74,7 +74,7 @@ type Manager struct {
 // NewManager creates two Informers to sync the upstream job store and the upstream
 // workflow store with a downstream job store and a downstream workflow store.
 // NewManager also creates a Transitioner which is used for transitioning workflows.
-func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClient *client.ThirdPartyClient, resyncPeriod k8sCtl.ResyncPeriodFunc) *Manager {
+func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClient *client.ThirdPartyClient) *Manager {
 	m := &Manager{
 		oldKubeClient: oldClient,
 		kubeClient:    kubeClient,
