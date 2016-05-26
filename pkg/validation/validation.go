@@ -159,7 +159,7 @@ func getWorkflowRunningAndCompletedSteps(workflow *api.Workflow) (running, compl
 	return
 }
 
-// ValidateWorkflowUpdate validates a workflow update checking if it should be allowed
+// ValidateWorkflowUpdate validates a workflow status update checking if it should be allowed
 // It returns a list of errors in case validation fails
 func ValidateWorkflowUpdate(workflow, oldWorkflow *api.Workflow) k8sField.ErrorList {
 	allErrs := k8sValidation.ValidateObjectMetaUpdate(&workflow.ObjectMeta, &oldWorkflow.ObjectMeta, k8sField.NewPath("metadata"))

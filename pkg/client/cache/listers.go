@@ -77,7 +77,7 @@ func (s *StoreToWorkflowLister) GetJobWorkflows(job *k8sBatch.Job) (workflows []
 	return
 }
 
-// StoreToJobLister gives a store List and Exists methods.
+// StoreToJobLister provides a store with List and Exists methods.
 // The store must contain only Jobs.
 type StoreToJobLister struct {
 	k8sCache.Store
