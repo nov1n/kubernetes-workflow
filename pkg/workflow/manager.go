@@ -47,7 +47,7 @@ import (
 
 const (
 	workflowUID                    = "workflow-uid"
-	requeueAfterStatusConflictTime = 500 * time.Millisecond
+	requeueAfterStatusConflictTime = 10000 * time.Millisecond
 )
 
 type WorkflowManager struct {
@@ -107,10 +107,10 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 	addEventHandler := func(obj interface{}) {
 		wf := obj.(*api.Workflow)
 
-		wfValid := wc.validateWorkflow(wf)
-		if !wfValid {
-			return
-		}
+		// wfValid := wc.validateWorkflow(wf)
+		// if !wfValid {
+		// return
+		// }
 
 		glog.V(3).Infof("Enqueuing controller for new workflow %v", wf.Name)
 		wc.enqueueController(wf)
@@ -273,39 +273,12 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 		return err
 	}
 	workflow := *obj.(*api.Workflow)
-	// Set defaults for workflow
-	if _, ok := workflow.Labels[workflowUID]; !ok {
-		newWorkflow, err := w.setUID(&workflow)
-		if err != nil {
-			serr, ok := err.(*k8sApiErr.StatusError)
-			if !ok {
-				glog.Errorf("Couldn't set labels on workflow %v: %v", key, err)
-				w.enqueueController(workflow)
-				return nil
-			}
-			if serr.Status().Code == http.StatusConflict {
-				glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-			}
-			return nil
-		}
-		workflow = *newWorkflow
-	}
 
 	// workflowKey, err := controller.KeyFunc(&workflow)
 	// if err != nil {
 	// 	glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)
 	// 	return err
 	// }
-
-	// If this is the first time syncWorkflow is called and
-	// the statuses map is empty, create it
-	if workflow.Status.Statuses == nil {
-		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
-		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
-		now := k8sApiUnv.Now()
-		workflow.Status.StartTime = &now
-	}
 
 	// If expectations are not met ???
 	// workflowNeedsSync := w.expectations.SatisfiedExpectations(workflowKey)
@@ -381,7 +354,6 @@ func (w *WorkflowManager) setUID(workflow *api.Workflow) (newWorkflow *api.Workf
 	}
 	workflow.Labels[workflowUID] = string(workflow.UID)
 	workflow.Spec.JobsSelector.MatchLabels[workflowUID] = string(workflow.UID)
-	newWorkflow, err = w.tpClient.Workflows(workflow.Namespace).Update(workflow)
 	return
 }
 
@@ -494,6 +466,36 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	glog.V(3).Infof("manage Workflow -> %v", workflow.Name)
 
 	needsStatusUpdate := false
+
+	// Set defaults for workflow
+	if _, ok := workflow.Labels[workflowUID]; !ok {
+		_, err := w.setUID(workflow)
+		if err != nil {
+			serr, ok := err.(*k8sApiErr.StatusError)
+			if !ok {
+				glog.Errorf("Couldn't set labels on workflow %v: %v", workflow.Name, err)
+				w.enqueueController(workflow)
+				return false
+			}
+			if serr.Status().Code == http.StatusConflict {
+				glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
+			}
+			return false
+		}
+		needsStatusUpdate = true
+	}
+
+	// Create empty status map
+	if workflow.Status.Statuses == nil {
+		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
+		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
+		now := k8sApiUnv.Now()
+		workflow.Status.StartTime = &now
+		needsStatusUpdate = true
+	}
+
+	// Check if workflow has completed
 	workflowComplete := true
 	for stepName, step := range workflow.Spec.Steps {
 		if stepStatus, ok := workflow.Status.Statuses[stepName]; ok && stepStatus.Complete {
@@ -563,11 +565,16 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 			glog.Errorf("Unable to get reference from %v: %v", job.Name, err)
 			return false
 		}
-		oldStatus := workflow.Status.Statuses[stepName]
+		oldStatus, exists := workflow.Status.Statuses[stepName]
 		jobFinished := controller.IsJobFinished(&job)
+		if exists && jobFinished == oldStatus.Complete {
+			return false
+		}
+
 		workflow.Status.Statuses[stepName] = api.WorkflowStepStatus{
 			Complete:  jobFinished,
-			Reference: *reference}
+			Reference: *reference,
+		}
 		glog.V(3).Infof("Updated job status from %v to %v for job %v in step %v for wf %v", oldStatus.Complete,
 			workflow.Status.Statuses[stepName].Complete, step.JobTemplate.Name, stepName, workflow.Name)
 	default: // reconciliate
