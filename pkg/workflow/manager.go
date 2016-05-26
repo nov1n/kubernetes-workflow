@@ -19,6 +19,7 @@ package workflow
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/golang/glog"
@@ -26,6 +27,7 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/client/cache"
 	"github.com/nov1n/kubernetes-workflow/pkg/controller"
+	"github.com/nov1n/kubernetes-workflow/pkg/validation"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
@@ -63,7 +65,7 @@ type WorkflowManager struct {
 	updateHandler func(workflow *api.Workflow) error
 	syncHandler   func(workflowKey string) error
 
-	// jobStoreSynced returns true if the jod store has been synced at least once.
+	// jobStoreSynced returns true if the job store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	jobStoreSynced func() bool
 
@@ -122,7 +124,6 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 			UpdateFunc: func(old, cur interface{}) {
 				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
 					wc.enqueueController(workflow)
-					// fmt.Println("UPDATE")
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
 			},
@@ -152,6 +153,20 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 	wc.syncHandler = wc.syncWorkflow
 	wc.jobStoreSynced = wc.jobController.HasSynced
 	return wc
+}
+
+// validateWorkflow validates a given workflow and sets its error label accordingly
+func (w *WorkflowManager) validateWorkflow(wf *api.Workflow) (valid bool) {
+	validationErrs := validation.ValidateWorkflow(wf)
+	if len(validationErrs) > 0 {
+		glog.Errorf("Workflow %v invalid: %v", wf.Name, validationErrs)
+		valid = false
+	} else {
+		valid = true
+	}
+
+	w.setLabels(wf, errorLabel)
+	return
 }
 
 // Run the main goroutine responsible for watching and syncing workflows.
@@ -227,6 +242,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 		return err
 	}
 	workflow := *obj.(*api.Workflow)
+
 	// Set defaults for workflow
 
 	// workflowKey, err := controller.KeyFunc(&workflow)
@@ -243,9 +259,9 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// 	}
 
 	// If the workflow is finished we don't have to do anything
-	// if isWorkflowFinished(&workflow) {
-	// 	return nil
-	// }
+	if isWorkflowFinished(&workflow) {
+		return nil
+	}
 
 	// If the the deadline has passed we add a condition, set completion time and
 	// fire an event
@@ -289,7 +305,17 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	return nil
 }
 
-func (w *WorkflowManager) setLabels(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
+// SetLabels adds the map to the workflow as labels.
+func (w *WorkflowManager) setLabels(workflow *api.Workflow, labels map[string]string) {
+	if workflow.Labels == nil {
+		workflow.Labels = make(map[string]string)
+	}
+	for key, value := range labels {
+		workflow.Labels[key] = value
+	}
+}
+
+func (w *WorkflowManager) setUID(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
 	glog.V(3).Infof("Setting labels on wf %v", workflow.Name)
 	if workflow.Labels == nil {
 		workflow.Labels = make(map[string]string)
@@ -335,6 +361,14 @@ func (w *WorkflowManager) updateWorkflowStatus(workflow *api.Workflow) error {
 }
 
 func isWorkflowFinished(w *api.Workflow) bool {
+	for _, c := range w.Status.Conditions {
+		conditionWFFinished := (c.Type == api.WorkflowComplete || c.Type == api.WorkflowFailed)
+		conditionTrue := c.Status == k8sApi.ConditionTrue
+		if conditionWFFinished && conditionTrue {
+			glog.V(3).Infof("Workflow %v finished", w.Name)
+			return true
+		}
+	}
 	return false
 }
 
@@ -417,12 +451,13 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 }
 
 func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
-	needsStatusUpdate := false
 	glog.V(3).Infof("Manage workflow %v", workflow.Name)
 
-	// Set labels for workflow
+	needsStatusUpdate := false
+
+	// Set defaults for workflow
 	if _, ok := workflow.Labels[workflowUID]; !ok {
-		_, err := w.setLabels(workflow)
+		_, err := w.setUID(workflow)
 		if err != nil {
 			serr, ok := err.(*k8sApiErr.StatusError)
 			if !ok {
@@ -431,23 +466,50 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 				return false
 			}
 			if serr.Status().Code == http.StatusConflict {
-				glog.V(3).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-				w.enqueueAfter(workflow, requeueAfterStatusConflictTime)
+				glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
 			}
 			return false
 		}
 		needsStatusUpdate = true
 	}
 
-	// If this is the first time syncWorkflow is called and
-	// the statuses map is empty, create it
+	// Create empty status map
 	if workflow.Status.Statuses == nil {
 		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
 		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
 		now := k8sApiUnv.Now()
 		workflow.Status.StartTime = &now
+		needsStatusUpdate = true
 	}
 
+	// Check if workflow has been validated
+	if wasValid, ok := workflow.Labels["valid"]; !ok || wasValid == "false" {
+		// Workflow has either not yet been validated or was invalid
+
+		// Check if workflow is valid
+		isValid := strconv.FormatBool(w.validateWorkflow(workflow))
+		workflow.Labels["valid"] = isValid
+
+		stillInvalid := wasValid == "false" && isValid == "false"
+		if stillInvalid {
+			// Workflow is still invalid, no state to update
+			// return as we do not want to process an invalid workflow
+			return false
+		}
+
+		turnedInvalid := isValid == "false"
+		if turnedInvalid {
+			// Workflow is validated for the first time and
+			// is invalid, update status on the server
+			return true
+		}
+
+		// Workflow is valid, continue processing
+		needsStatusUpdate = true
+	}
+
+	// Check if workflow has completed
 	workflowComplete := true
 	for stepName, step := range workflow.Spec.Steps {
 		if stepStatus, ok := workflow.Status.Statuses[stepName]; ok && stepStatus.Complete {
@@ -530,7 +592,8 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 		}
 		workflow.Status.Statuses[stepName] = api.WorkflowStepStatus{
 			Complete:  jobFinished,
-			Reference: *reference}
+			Reference: *reference,
+		}
 		glog.V(3).Infof("Updated job status from %v to %v for job %v in step %v for wf %v", oldStatus.Complete,
 			workflow.Status.Statuses[stepName].Complete, job.Name, stepName, workflow.Name)
 	default: // reconciliate
