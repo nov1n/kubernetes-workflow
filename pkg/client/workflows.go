@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path"
 	"reflect"
 	"time"
 
@@ -83,16 +84,15 @@ func (w *workflows) UpdateStatus(workflow *api.Workflow) (result *api.Workflow, 
 func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource string) (result *api.Workflow, err error) {
 	nsPath := ""
 	if w.ns != "" {
-		nsPath = "/namespaces/" + w.ns
+		nsPath = path.Join("/", "namespaces", w.ns)
 	}
 	if subresource != "" {
-		subresource = "/" + subresource
+		subresource = path.Join("/", subresource)
 	}
 	if workflow.Name == "" {
 		return nil, fmt.Errorf("no name found in workflow")
 	}
-	// @borismattijssen: TODO replace with path.Join
-	url := w.client.baseURL + nsPath + "/workflows/" + workflow.Name + subresource
+	url := path.Join(w.client.baseURL, nsPath, "workflows", workflow.Name, subresource)
 	b, err := json.Marshal(workflow)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't encode workflow: %v", err)
@@ -128,9 +128,9 @@ func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource st
 func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err error) {
 	nsPath := ""
 	if w.ns != "" {
-		nsPath = "/namespaces/" + w.ns
+		nsPath = path.Join("/", "namespaces", w.ns)
 	}
-	url := w.client.baseURL + nsPath + "/workflows"
+	url := path.Join(w.client.baseURL, nsPath, "workflows")
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach %s: %v", url, err)
@@ -144,9 +144,9 @@ func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err
 func (w *workflows) Get(name string) (result *api.Workflow, err error) {
 	nsPath := ""
 	if w.ns != "" {
-		nsPath = "/namespaces/" + w.ns
+		nsPath = path.Join("/", "namespaces", w.ns)
 	}
-	url := w.client.baseURL + nsPath + "/workflows/" + name
+	url := path.Join(w.client.baseURL, nsPath, "workflows", name)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("could not reach %s: %v", url, err)
