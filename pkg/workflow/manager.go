@@ -100,7 +100,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 			UpdateFunc: func(old, cur interface{}) {
 				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
 					// TODO: This should be uncommented. For now keep it this way to be consistent with master.
-					// m.enqueueWorkflow(workflow)
+					m.enqueueWorkflow(workflow)
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
 			},
