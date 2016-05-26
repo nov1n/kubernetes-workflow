@@ -33,6 +33,14 @@ import (
 	k8sRunt "k8s.io/kubernetes/pkg/runtime"
 )
 
+const (
+	// WorkflowStepLabelKey defines the label assigned to a workflow
+	const WorkflowStepLabelKey = "kubernetes.io/workflow"
+
+	// Version of the codec
+	const codecVersion = "v1"
+)
+
 // JobControlInterface defines methods for JobControl
 type JobControlInterface interface {
 	CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, key string) error
@@ -68,8 +76,7 @@ func getJobsAnnotationSet(template *k8sBatch.JobTemplateSpec, object k8sRunt.Obj
 		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
 	}
 
-	//TODO: codec  hardcoded to v1 for the moment.
-	codec := k8sApi.Codecs.LegacyCodec(k8sApiUnv.GroupVersion{Group: k8sApi.GroupName, Version: "v1"})
+	codec := k8sApi.Codecs.LegacyCodec(k8sApiUnv.GroupVersion{Group: k8sApi.GroupName, Version: codecVersion})
 
 	createdByRefJSON, err := k8sRunt.Encode(codec, &k8sApi.SerializedReference{
 		Reference: *createdByRef,
@@ -81,9 +88,6 @@ func getJobsAnnotationSet(template *k8sBatch.JobTemplateSpec, object k8sRunt.Obj
 	return desiredAnnotations, nil
 }
 
-// WorkflowStepLabelKey defines the label assigned to a workflow
-const WorkflowStepLabelKey = "kubernetes.io/workflow"
-
 // getWorkflowJobLabelSet returns the set of labels for a job in a workflow
 func getWorkflowJobLabelSet(workflow *api.Workflow, template *k8sBatch.JobTemplateSpec, stepName string) k8sLabels.Set {
 	desiredLabels := make(k8sLabels.Set)
@@ -93,7 +97,7 @@ func getWorkflowJobLabelSet(workflow *api.Workflow, template *k8sBatch.JobTempla
 	for k, v := range template.Labels {
 		desiredLabels[k] = v
 	}
-	desiredLabels[WorkflowStepLabelKey] = stepName // @sdminonne: TODO double check this
+	desiredLabels[WorkflowStepLabelKey] = stepName
 	return desiredLabels
 }
 

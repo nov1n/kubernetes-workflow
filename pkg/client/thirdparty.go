@@ -22,6 +22,12 @@ import (
 	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
 )
 
+const (
+	apiPath = "/apis"
+	defaultQPS = 5
+	defaultBurst = 10
+)
+
 // ThirdPartyClient can be used to access third party resources
 type ThirdPartyClient struct {
 	*k8sRestCl.RESTClient
@@ -49,7 +55,7 @@ func NewThirdParty(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) (*ThirdPartyCl
 
 // Configuration for RESTClient
 func setThirdPartyDefaults(groupVersion *k8sApiUnv.GroupVersion, config *k8sRestCl.Config) error {
-	config.APIPath = "/apis"
+	config.APIPath = APIPath
 	if config.UserAgent == "" {
 		config.UserAgent = k8sRestCl.DefaultKubernetesUserAgent()
 	}
@@ -61,10 +67,10 @@ func setThirdPartyDefaults(groupVersion *k8sApiUnv.GroupVersion, config *k8sRest
 	config.NegotiatedSerializer = k8sApi.Codecs
 
 	if config.QPS == 0 {
-		config.QPS = 5
+		config.QPS = defaultQPS
 	}
 	if config.Burst == 0 {
-		config.Burst = 10
+		config.Burst = defaultBurst
 	}
 	return nil
 }
