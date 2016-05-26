@@ -18,7 +18,6 @@ package workflow
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -48,10 +47,12 @@ import (
 )
 
 const (
-	workflowUID                    = "workflow-uid"
+	workflowUIDLabel               = "workflow-uid"
+	workflowValidLabel             = "valid"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
 	retryOnStatusConflict          = 3
+	falseString                    = "false"
 )
 
 type WorkflowManager struct {
@@ -155,18 +156,14 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 	return wc
 }
 
-// validateWorkflow validates a given workflow and sets its error label accordingly
-func (w *WorkflowManager) validateWorkflow(wf *api.Workflow) (valid bool) {
+// isWorkflowValid validates a given workflow
+func (w *WorkflowManager) isWorkflowValid(wf *api.Workflow) bool {
 	validationErrs := validation.ValidateWorkflow(wf)
 	if len(validationErrs) > 0 {
 		glog.Errorf("Workflow %v invalid: %v", wf.Name, validationErrs)
-		valid = false
-	} else {
-		valid = true
+		return false
 	}
-
-	w.setLabels(wf, errorLabel)
-	return
+	return true
 }
 
 // Run the main goroutine responsible for watching and syncing workflows.
@@ -306,7 +303,8 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 }
 
 // SetLabels adds the map to the workflow as labels.
-func (w *WorkflowManager) setLabels(workflow *api.Workflow, labels map[string]string) {
+// TODO: move to util
+func setLabels(workflow *api.Workflow, labels map[string]string) {
 	if workflow.Labels == nil {
 		workflow.Labels = make(map[string]string)
 	}
@@ -315,19 +313,18 @@ func (w *WorkflowManager) setLabels(workflow *api.Workflow, labels map[string]st
 	}
 }
 
-func (w *WorkflowManager) setUID(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
+// TODO: move to util
+func setUID(workflow *api.Workflow) {
 	glog.V(3).Infof("Setting labels on wf %v", workflow.Name)
-	if workflow.Labels == nil {
-		workflow.Labels = make(map[string]string)
-	}
 	if workflow.Spec.JobsSelector == nil {
 		workflow.Spec.JobsSelector = &k8sApiUnv.LabelSelector{
 			MatchLabels: make(map[string]string),
 		}
 	}
-	workflow.Labels[workflowUID] = string(workflow.UID)
-	workflow.Spec.JobsSelector.MatchLabels[workflowUID] = string(workflow.UID)
-	return
+	setLabels(workflow, map[string]string{
+		workflowUIDLabel: string(workflow.UID),
+	})
+	workflow.Spec.JobsSelector.MatchLabels[workflowUIDLabel] = string(workflow.UID)
 }
 
 // pastActiveDeadline checks if workflow has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -336,10 +333,9 @@ func pastActiveDeadline(workflow *api.Workflow) bool {
 }
 
 func (w *WorkflowManager) updateWorkflowStatus(workflow *api.Workflow) error {
-	var updateErr error
 	for i, rv := 0, workflow.ResourceVersion; ; i++ {
 		workflow.ResourceVersion = rv
-		_, updateErr = w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
+		_, updateErr := w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
 		if updateErr == nil {
 			glog.V(2).Infof("Updated status of wf %v successfully", workflow.Name)
 			return nil
@@ -353,7 +349,7 @@ func (w *WorkflowManager) updateWorkflowStatus(workflow *api.Workflow) error {
 		}
 		getWorkflow, getErr := w.tpClient.Workflows(workflow.Namespace).Get(workflow.Name)
 		if getErr != nil {
-			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, updateErr)
+			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, getErr)
 		}
 		rv = getWorkflow.ResourceVersion
 		glog.V(2).Infof("Tried to update status of wf %v in retry %d/%d, but encountered status error (%v), retrying", workflow.Name, i, retryOnStatusConflict, statusErr)
@@ -456,21 +452,8 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	needsStatusUpdate := false
 
 	// Set defaults for workflow
-	if _, ok := workflow.Labels[workflowUID]; !ok {
-		_, err := w.setUID(workflow)
-		if err != nil {
-			serr, ok := err.(*k8sApiErr.StatusError)
-			if !ok {
-				glog.Errorf("Couldn't set labels on workflow %v: %v", workflow.Name, err)
-				w.enqueueController(workflow)
-				return false
-			}
-			if serr.Status().Code == http.StatusConflict {
-				glog.V(2).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-			}
-			return false
-		}
+	if _, ok := workflow.Labels[workflowUIDLabel]; !ok {
+		setUID(workflow)
 		needsStatusUpdate = true
 	}
 
@@ -484,21 +467,21 @@ func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	}
 
 	// Check if workflow has been validated
-	if wasValid, ok := workflow.Labels["valid"]; !ok || wasValid == "false" {
+	if wasValid, ok := workflow.Labels[workflowValidLabel]; !ok || wasValid == falseString {
 		// Workflow has either not yet been validated or was invalid
 
 		// Check if workflow is valid
-		isValid := strconv.FormatBool(w.validateWorkflow(workflow))
-		workflow.Labels["valid"] = isValid
+		isValid := strconv.FormatBool(w.isWorkflowValid(workflow))
+		workflow.Labels[workflowValidLabel] = isValid
 
-		stillInvalid := wasValid == "false" && isValid == "false"
+		stillInvalid := wasValid == falseString && isValid == falseString
 		if stillInvalid {
 			// Workflow is still invalid, no state to update
 			// return as we do not want to process an invalid workflow
 			return false
 		}
 
-		turnedInvalid := isValid == "false"
+		turnedInvalid := isValid == falseString
 		if turnedInvalid {
 			// Workflow is validated for the first time and
 			// is invalid, update status on the server
