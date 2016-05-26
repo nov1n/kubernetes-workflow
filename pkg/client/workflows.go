@@ -42,7 +42,7 @@ type WorkflowsNamespacer interface {
 // WorkflowInterface has methods to work with Workflow resources.
 type WorkflowInterface interface {
 	List(opts k8sApi.ListOptions) (*api.WorkflowList, error)
-	// Get(name string) (*api.Pod, error)
+	Get(name string) (*api.Workflow, error)
 	// Delete(name string, options *api.DeleteOptions) error
 	// Create(pod *api.Pod) (*api.Pod, error)
 	Update(workflow *api.Workflow) (*api.Workflow, error)
@@ -132,6 +132,22 @@ func (w *workflows) List(opts k8sApi.ListOptions) (result *api.WorkflowList, err
 	}
 	dec := json.NewDecoder(resp.Body)
 	result = &api.WorkflowList{}
+	err = dec.Decode(&result)
+	return
+}
+
+func (w *workflows) Get(name string) (result *api.Workflow, err error) {
+	nsPath := ""
+	if w.ns != "" {
+		nsPath = "/namespaces/" + w.ns
+	}
+	url := w.client.baseURL + nsPath + "/workflows/" + name
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("could not reach %s: %v", url, err)
+	}
+	dec := json.NewDecoder(resp.Body)
+	result = &api.Workflow{}
 	err = dec.Decode(&result)
 	return
 }

@@ -17,7 +17,7 @@ limitations under the License.
 package workflow
 
 import (
-	"net/http"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
@@ -48,6 +48,7 @@ const (
 	workflowUID                    = "workflow-uid"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
+	retryOnStatusConflict          = 3
 )
 
 type WorkflowManager struct {
@@ -119,7 +120,7 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 			AddFunc: wc.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
 				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
-					// wc.enqueueController(workflow)
+					wc.enqueueController(workflow)
 					// fmt.Println("UPDATE")
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
@@ -226,38 +227,12 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	}
 	workflow := *obj.(*api.Workflow)
 	// Set defaults for workflow
-	if _, ok := workflow.Labels[workflowUID]; !ok {
-		newWorkflow, err := w.setLabels(&workflow)
-		if err != nil {
-			serr, ok := err.(*k8sApiErr.StatusError)
-			if !ok {
-				glog.Errorf("Couldn't set labels on workflow %v: %v", key, err)
-				w.enqueueController(workflow)
-				return nil
-			}
-			if serr.Status().Code == http.StatusConflict {
-				glog.V(3).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-			}
-			return nil
-		}
-		workflow = *newWorkflow
-	}
 
 	// workflowKey, err := controller.KeyFunc(&workflow)
 	// if err != nil {
 	// 	glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)
 	// 	return err
 	// }
-
-	// If this is the first time syncWorkflow is called and
-	// the statuses map is empty, create it
-	if workflow.Status.Statuses == nil {
-		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
-		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
-		now := k8sApiUnv.Now()
-		workflow.Status.StartTime = &now
-	}
 
 	// If expectations are not met ???
 	// workflowNeedsSync := w.expectations.SatisfiedExpectations(workflowKey)
@@ -304,16 +279,8 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// Try to schedule suitable steps
 	if w.manageWorkflow(&workflow) {
 		if err := w.updateHandler(&workflow); err != nil {
-			serr, ok := err.(*k8sApiErr.StatusError)
-			if !ok {
-				glog.Errorf("Failed to update workflow %v, requeuing.  Error: %v", workflow.Name, err)
-				w.enqueueController(&workflow)
-				return nil
-			}
-			if serr.Status().Code == http.StatusConflict {
-				glog.V(2).Infof("encountered status conflict on workflow update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-			}
+			glog.Errorf("Failed to update workflow %v, requeuing after %v.  Error: %v", workflow.Name, requeueAfterStatusConflictTime, err)
+			w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
 			return nil
 		}
 	}
@@ -321,7 +288,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	return nil
 }
 
-func (w *WorkflowManager) setLabels(workflow *api.Workflow) (newWorkflow *api.Workflow, err error) {
+func (w *WorkflowManager) setLabels(workflow *api.Workflow) {
 	glog.V(3).Infof("Setting labels on wf %v", workflow.Name)
 	if workflow.Labels == nil {
 		workflow.Labels = make(map[string]string)
@@ -333,8 +300,6 @@ func (w *WorkflowManager) setLabels(workflow *api.Workflow) (newWorkflow *api.Wo
 	}
 	workflow.Labels[workflowUID] = string(workflow.UID)
 	workflow.Spec.JobsSelector.MatchLabels[workflowUID] = string(workflow.UID)
-	newWorkflow, err = w.tpClient.Workflows(workflow.Namespace).Update(workflow)
-	return
 }
 
 // pastActiveDeadline checks if workflow has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -343,8 +308,27 @@ func pastActiveDeadline(workflow *api.Workflow) bool {
 }
 
 func (w *WorkflowManager) updateWorkflowStatus(workflow *api.Workflow) error {
-	_, err := w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
-	return err
+	for i, rv := 0, workflow.ResourceVersion; ; i++ {
+		workflow.ResourceVersion = rv
+		_, updateErr := w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
+		if updateErr == nil {
+			glog.V(2).Infof("Updated status of wf %v successfully", workflow.Name)
+			return nil
+		}
+		if i >= retryOnStatusConflict {
+			return fmt.Errorf("tried to update status of wf %v, but amount of retries (%d) exceeded", workflow.Name, retryOnStatusConflict)
+		}
+		statusErr, ok := updateErr.(*k8sApiErr.StatusError)
+		if !ok {
+			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, updateErr)
+		}
+		getWorkflow, getErr := w.tpClient.Workflows(workflow.Namespace).Get(workflow.Name)
+		if getErr != nil {
+			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, getErr)
+		}
+		rv = getWorkflow.ResourceVersion
+		glog.V(2).Infof("Tried to update status of wf %v in retry %d/%d, but encountered status error (%v), retrying", workflow.Name, i, retryOnStatusConflict, statusErr)
+	}
 }
 
 func isWorkflowFinished(w *api.Workflow) bool {
@@ -363,7 +347,7 @@ func (w *WorkflowManager) enqueueController(obj interface{}) {
 // enqueueAfter enqueues a workflow after a given time.
 // enqueueAfter is non-blocking.
 func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
-	go func() {
+	func() {
 		time.Sleep(d)
 		w.enqueueController(obj)
 	}()
@@ -373,7 +357,7 @@ func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
 // enqueueKeyAfter enqueues a workflow key after a given time.
 // enqueueKeyAfter is non-blocking.
 func (w *WorkflowManager) enqueueKeyAfter(key string, d time.Duration) {
-	go func() {
+	func() {
 		time.Sleep(d)
 		w.queue.Add(key)
 	}()
@@ -432,6 +416,22 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	needsStatusUpdate := false
 	glog.V(3).Infof("Manage workflow %v", workflow.Name)
+
+	// Set labels for workflow
+	if _, ok := workflow.Labels[workflowUID]; !ok {
+		w.setLabels(workflow)
+		needsStatusUpdate = true
+	}
+
+	// If this is the first time syncWorkflow is called and
+	// the statuses map is empty, create it
+	if workflow.Status.Statuses == nil {
+		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
+		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
+		now := k8sApiUnv.Now()
+		workflow.Status.StartTime = &now
+	}
+
 	workflowComplete := true
 	for stepName, step := range workflow.Spec.Steps {
 		if stepStatus, ok := workflow.Status.Statuses[stepName]; ok && stepStatus.Complete {
@@ -507,8 +507,11 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 			glog.Errorf("Unable to get reference from job %v in step %v of wf %v: %v", job.Name, stepName, workflow.Name, err)
 			return false
 		}
-		oldStatus := workflow.Status.Statuses[stepName]
+		oldStatus, exists := workflow.Status.Statuses[stepName]
 		jobFinished := controller.IsJobFinished(&job)
+		if exists && jobFinished == oldStatus.Complete {
+			return false
+		}
 		workflow.Status.Statuses[stepName] = api.WorkflowStepStatus{
 			Complete:  jobFinished,
 			Reference: *reference}
