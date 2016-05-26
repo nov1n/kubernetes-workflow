@@ -226,37 +226,12 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	}
 	workflow := *obj.(*api.Workflow)
 	// Set defaults for workflow
-	if _, ok := workflow.Labels[workflowUID]; !ok {
-		_, err := w.setLabels(&workflow)
-		if err != nil {
-			serr, ok := err.(*k8sApiErr.StatusError)
-			if !ok {
-				glog.Errorf("Couldn't set labels on workflow %v: %v", key, err)
-				w.enqueueController(workflow)
-				return nil
-			}
-			if serr.Status().Code == http.StatusConflict {
-				glog.V(3).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-			}
-			return nil
-		}
-	}
 
 	// workflowKey, err := controller.KeyFunc(&workflow)
 	// if err != nil {
 	// 	glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)
 	// 	return err
 	// }
-
-	// If this is the first time syncWorkflow is called and
-	// the statuses map is empty, create it
-	if workflow.Status.Statuses == nil {
-		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
-		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
-		now := k8sApiUnv.Now()
-		workflow.Status.StartTime = &now
-	}
 
 	// If expectations are not met ???
 	// workflowNeedsSync := w.expectations.SatisfiedExpectations(workflowKey)
@@ -332,7 +307,6 @@ func (w *WorkflowManager) setLabels(workflow *api.Workflow) (newWorkflow *api.Wo
 	}
 	workflow.Labels[workflowUID] = string(workflow.UID)
 	workflow.Spec.JobsSelector.MatchLabels[workflowUID] = string(workflow.UID)
-	newWorkflow, err = w.tpClient.Workflows(workflow.Namespace).Update(workflow)
 	return
 }
 
@@ -431,6 +405,35 @@ func (w *WorkflowManager) deleteJob(obj interface{}) {
 func (w *WorkflowManager) manageWorkflow(workflow *api.Workflow) bool {
 	needsStatusUpdate := false
 	glog.V(3).Infof("Manage workflow %v", workflow.Name)
+
+	// Set labels for workflow
+	if _, ok := workflow.Labels[workflowUID]; !ok {
+		_, err := w.setLabels(workflow)
+		if err != nil {
+			serr, ok := err.(*k8sApiErr.StatusError)
+			if !ok {
+				glog.Errorf("Couldn't set labels on workflow %v: %v", workflow.Name, err)
+				w.enqueueController(workflow)
+				return false
+			}
+			if serr.Status().Code == http.StatusConflict {
+				glog.V(3).Infof("encountered status conflict on workflow label update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
+				w.enqueueAfter(workflow, requeueAfterStatusConflictTime)
+			}
+			return false
+		}
+		needsStatusUpdate = true
+	}
+
+	// If this is the first time syncWorkflow is called and
+	// the statuses map is empty, create it
+	if workflow.Status.Statuses == nil {
+		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
+		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
+		now := k8sApiUnv.Now()
+		workflow.Status.StartTime = &now
+	}
+
 	workflowComplete := true
 	for stepName, step := range workflow.Spec.Steps {
 		if stepStatus, ok := workflow.Status.Statuses[stepName]; ok && stepStatus.Complete {
