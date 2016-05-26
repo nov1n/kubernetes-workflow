@@ -14,7 +14,6 @@ import (
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
-	k8sClSet "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	k8sClSetUnv "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	k8sRec "k8s.io/kubernetes/pkg/client/record"
 	k8sUtRunt "k8s.io/kubernetes/pkg/util/runtime"
@@ -52,23 +51,22 @@ type Transitioner struct {
 	recorder k8sRec.EventRecorder
 }
 
-// NewTransitioner returns a new Transitioner
-func NewTransitioner(tpClient *client.ThirdPartyClient, kubeClient k8sClSet.Interface,
-	jobStoreSynced func() bool, workflowStore *cache.StoreToWorkflowLister, jobStore *cache.StoreToJobLister) *Transitioner {
+// NewTransitionerFor returns a new Transitioner given a Manager.
+func NewTransitionerFor(m *Manager) *Transitioner {
 	eventBroadcaster := k8sRec.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&k8sClSetUnv.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(&k8sClSetUnv.EventSinkImpl{Interface: m.kubeClient.Core().Events("")})
 
 	return &Transitioner{
-		tpClient: tpClient,
+		tpClient: m.tpClient,
 		jobControl: controller.WorkflowJobControl{
-			KubeClient: kubeClient,
+			KubeClient: m.kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
 		},
-		jobStoreSynced: jobStoreSynced,
-		workflowStore:  workflowStore,
-		jobStore:       jobStore,
+		jobStoreSynced: m.jobStoreSynced,
+		workflowStore:  m.workflowStore,
+		jobStore:       m.jobStore,
 		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
 	}
 }
@@ -148,6 +146,12 @@ func isWorkflowFinished(workflow *api.Workflow) bool {
 	}
 	return false
 }
+
+type RequeueAction struct{}
+type RequeueAfterAction struct {
+	duration time.Duration
+}
+type NeedsStatusUpdateAction struct{}
 
 // Transition transitions a workflow from its current state to a desired state.
 // It's given a key created by k8sController.KeyFunc.

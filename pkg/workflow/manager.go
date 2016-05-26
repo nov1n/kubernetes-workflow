@@ -54,12 +54,12 @@ type Manager struct {
 	jobStoreSynced func() bool
 
 	// A store of workflow, populated by the frameworkController
-	workflowStore cache.StoreToWorkflowLister
+	workflowStore *cache.StoreToWorkflowLister
 	// Watches changes to all workflows
 	workflowController *k8sFrwk.Controller
 
 	// Store of job
-	jobStore cache.StoreToJobLister
+	jobStore *cache.StoreToJobLister
 
 	// Watches changes to all jobs
 	jobController *k8sFrwk.Controller
@@ -128,8 +128,8 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 		},
 	)
 
-	m.transitioner = NewTransitioner(tpClient, kubeClient, m.jobController.HasSynced, &m.workflowStore, &m.jobStore)
 	m.jobStoreSynced = m.jobController.HasSynced
+	m.transitioner = NewTransitionerFor(m)
 	return m
 }
 
