@@ -8,6 +8,9 @@
         "activeDeadlineSeconds": 3600,
         "steps": {
             "step-a": {
+                "dependencies": [
+                    "step-a"
+                ],
                 "jobTemplate": {
                     "metadata": {
                         "name": "job1"
