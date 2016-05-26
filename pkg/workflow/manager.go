@@ -17,6 +17,7 @@ limitations under the License.
 package workflow
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -48,6 +49,7 @@ const (
 	workflowUID                    = "workflow-uid"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
+	retryOnStatusConflict          = 3
 )
 
 type WorkflowManager struct {
@@ -278,16 +280,8 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	// Try to schedule suitable steps
 	if w.manageWorkflow(&workflow) {
 		if err := w.updateHandler(&workflow); err != nil {
-			serr, ok := err.(*k8sApiErr.StatusError)
-			if !ok {
-				glog.Errorf("Failed to update workflow %v, requeuing.  Error: %v", workflow.Name, err)
-				w.enqueueController(&workflow)
-				return nil
-			}
-			if serr.Status().Code == http.StatusConflict {
-				glog.V(2).Infof("encountered status conflict on workflow update (%v), requeuing after %v", workflow.Name, requeueAfterStatusConflictTime)
-				w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
-			}
+			glog.Errorf("Failed to update workflow %v, requeuing after %v.  Error: %v", workflow.Name, requeueAfterStatusConflictTime, err)
+			w.enqueueAfter(&workflow, requeueAfterStatusConflictTime)
 			return nil
 		}
 	}
@@ -316,8 +310,28 @@ func pastActiveDeadline(workflow *api.Workflow) bool {
 }
 
 func (w *WorkflowManager) updateWorkflowStatus(workflow *api.Workflow) error {
-	_, err := w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
-	return err
+	var updateErr error
+	for i, rv := 0, workflow.ResourceVersion; ; i++ {
+		workflow.ResourceVersion = rv
+		_, updateErr = w.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
+		if updateErr == nil {
+			glog.V(2).Infof("Updated status of wf %v successfully", workflow.Name)
+			return nil
+		}
+		if i >= retryOnStatusConflict {
+			return fmt.Errorf("tried to update status of wf %v, but amount of retries (%d) exceeded", workflow.Name, retryOnStatusConflict)
+		}
+		statusErr, ok := updateErr.(*k8sApiErr.StatusError)
+		if !ok {
+			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, updateErr)
+		}
+		getWorkflow, getErr := w.tpClient.Workflows(workflow.Namespace).Get(workflow.Name)
+		if getErr != nil {
+			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, updateErr)
+		}
+		rv = getWorkflow.ResourceVersion
+		glog.V(2).Infof("Tried to update status of wf %v in retry %d/%d, but encountered status error (%v), retrying", workflow.Name, i, retryOnStatusConflict, statusErr)
+	}
 }
 
 func isWorkflowFinished(w *api.Workflow) bool {
