@@ -20,21 +20,26 @@ import (
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
+// ThirdPartyWatcher can watch thirdparty resources for changes and
+// generate events on the Result channel
 type ThirdPartyWatcher struct {
 	Result  chan k8sWatch.Event
 	Stopped bool
 }
 
+// NewThirdPartyWatcher creates a ThirdPartyWatcher
 func NewThirdPartyWatcher() *ThirdPartyWatcher {
 	return &ThirdPartyWatcher{
 		Result: make(chan k8sWatch.Event),
 	}
 }
 
+// ResultChan returns the channel on which events are sent
 func (tpw *ThirdPartyWatcher) ResultChan() <-chan k8sWatch.Event {
 	return tpw.Result
 }
 
+// Stop stops the ThirdPartyWatcher from watching and generating events
 func (tpw *ThirdPartyWatcher) Stop() {
 	tpw.Stopped = true
 }

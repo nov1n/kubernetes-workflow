@@ -28,11 +28,12 @@ type ThirdPartyClient struct {
 	baseURL string
 }
 
+// Workflows returns a new workflows object given a namespace
 func (c *ThirdPartyClient) Workflows(namespace string) WorkflowInterface {
 	return newWorkflows(c, namespace)
 }
 
-// NewThirdParty creates a new ThirdPartyClient
+// NewThirdParty returns a new ThirdPartyClient
 func NewThirdParty(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) (*ThirdPartyClient, error) {
 	if err := setThirdPartyDefaults(&gv, &c); err != nil {
 		return nil, err
@@ -41,6 +42,7 @@ func NewThirdParty(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) (*ThirdPartyCl
 	if err != nil {
 		return nil, err
 	}
+	// TODO: Use path.join
 	baseURL := c.Host + c.APIPath + "/" + c.GroupVersion.Group + "/" + c.GroupVersion.Version
 	return &ThirdPartyClient{client, baseURL}, nil
 }

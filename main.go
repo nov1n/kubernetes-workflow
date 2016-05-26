@@ -17,7 +17,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 
 	"net"
 
@@ -33,41 +32,43 @@ import (
 )
 
 func main() {
+	// Flush any buffered logs on exit
 	defer glog.Flush()
 
 	// Parse cmdline flags
 	host := flag.String("host", "127.0.0.1", "IP address of kubernetes API server")
 	port := flag.String("port", "8080", "Port of the kubernetes API server")
-
 	flag.Parse()
 
-	// Create client
+	// Configure host using the cmdline flags
 	clientConfig := restclient.Config{
 		Host: "http://" + net.JoinHostPort(*host, *port),
 	}
 
+	// Create thirdparty client to manage third party resources
 	thirdPartyClient, err := client.NewThirdParty(k8sApiUnversioned.GroupVersion{
 		Group:   "nerdalize.com",
 		Version: "v1alpha1",
 	}, clientConfig)
 	if err != nil {
-		fmt.Println("Couldn't create 3rd-party client: ", err)
-		return
+		glog.Fatalf("Could not create 3rd party client: %v", err)
 	}
 
+	// Create clientset holding multiple different clients
 	client, err := clientset.NewForConfig(&clientConfig)
 	if err != nil {
-		fmt.Println("Couldn't create set client: ", err)
-		return
+		glog.Fatalf("Could not create set client: %v", err)
 	}
+
+	// Create old client to manage batch resources (e.g. jobs)
 	oldClient, err := k8sClient.New(&clientConfig)
 	if err != nil {
-		fmt.Println("Couldn't create batch client: ", err)
-		return
+		glog.Fatalf("Couldn not create batch client: %v", err)
 	}
 
-	fmt.Println("Clients initialized")
+	glog.V(3).Infof("Clients initialized")
 
+	// Start the workflow manager
 	manager := workflow.NewWorkflowManager(oldClient, client, thirdPartyClient, k8sController.NoResyncPeriodFunc)
 	stopChan := make(chan struct{})
 	manager.Run(5, stopChan)

@@ -22,69 +22,73 @@ import (
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 )
 
-// Workflow implements
+// Workflow object representing a single workflow
 type Workflow struct {
 	k8sApiUnv.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	k8sApi.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec represents the desired behaviour of the Workflow.
+	// Spec represents the desired behavior of the Workflow
 	Spec WorkflowSpec `json:"spec,omitempty"`
 
 	// Status contains the current status of the Workflow
 	Status WorkflowStatus `json:"status,omitempty"`
 }
 
-// WorkflowList implements list of Workflow.
+// WorkflowList represents a list of Workflow objects
 type WorkflowList struct {
 	k8sApiUnv.TypeMeta `json:",inline"`
 	// Standard list metadata
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	k8sApiUnv.ListMeta `json:"metadata,omitempty"`
 
-	// Items is the list of Workflow
+	// Items contains the list of Workflow objects
 	Items []Workflow `json:"items"`
 }
 
-// WorkflowSpec contains Workflow specification
+// WorkflowSpec contains the Workflow specification
 type WorkflowSpec struct {
 	// Standard object's metadata.
 	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
 	k8sApi.ObjectMeta `json:"metadata,omitempty"`
 
+	// Maximum time before the Workflow may run before it is killed
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty"`
 
+	// Steps maps step names to WorkflowStep objects for O(1) access by name
 	Steps map[string]WorkflowStep `json:"steps,omitempty"`
 
-	// Selector for created jobs (if any)
+	// Selector for jobs that belong to the Workflow
 	JobsSelector *k8sApiUnv.LabelSelector `json:"jobsSelector,omitempty"`
 }
 
-// WorkflowStep contains necessary information to identifiy the node of the workflow graph
+// WorkflowStep represents a single step in the Workflow
 type WorkflowStep struct {
-	// JobTemplate contains the job specificaton that should be run in this Workflow.
-	// Only one between externalRef and jobTemplate can be set.
+	// JobTemplate contains the job specificaton that should be run in this step
+	// Only one of externalRef and jobTemplate can be set
 	JobTemplate *k8sBatch.JobTemplateSpec `json:"jobTemplate,omitempty"`
 
-	// ExternalRef contains a reference to another schedulable resource.
-	// Only one between ExternalRef and JobTemplate can be set.
+	// ExternalRef contains a reference to another schedulable resource
+	// Only one of ExternalRef and JobTemplate can be set
 	ExternalRef *k8sApi.ObjectReference `json:"externalRef,omitempty"`
 
 	// Dependecies represent dependecies of the current workflow step
 	Dependencies []string `json:"dependencies,omitempty"`
 }
 
+// WorkflowConditionType is a type for conditions describing a Workflow
 type WorkflowConditionType string
 
-// These are valid conditions of a workflow.
+// Possible conditions which may be present on a Workflow at a point in time
 const (
-	// WorkflowComplete means the workflow has completed its execution.
+	// WorkflowComplete means the workflow has completed its execution
 	WorkflowComplete WorkflowConditionType = "Complete"
-	// WorkflowFailed means the workflow has failed its execution.
+	// WorkflowFailed means the workflow has failed its execution
 	WorkflowFailed WorkflowConditionType = "Failed"
 )
 
+// WorkflowCondition describes a condition on a workflow
 type WorkflowCondition struct {
 	// Type of workflow condition
 	Type WorkflowConditionType `json:"type"`
@@ -100,6 +104,7 @@ type WorkflowCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// WorkflowStatus represents the current state/status of the Workflow
 type WorkflowStatus struct {
 	// Conditions represent the latest available observations of an object's current state.
 	Conditions []WorkflowCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
@@ -119,7 +124,7 @@ type WorkflowStatus struct {
 	Statuses map[string]WorkflowStepStatus `json:"statuses"`
 }
 
-// WorkflowStepStatus contains necessary information for the step status
+// WorkflowStepStatus represents the status of a single Workflow step
 type WorkflowStepStatus struct {
 	// Complete reports the completion of status
 	Complete bool `json:"complete"`
@@ -127,12 +132,15 @@ type WorkflowStepStatus struct {
 	Reference k8sApi.ObjectReference `json:"reference"`
 }
 
+// GetObjectKind returns a type description of a Workflow
 func (wf *Workflow) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
 		Kind:       "Workflow",
 		APIVersion: "nerdalize.com/v1alpha1",
 	}
 }
+
+// GetObjectKind returns a type description of a WorkflowList
 func (wf *WorkflowList) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
 		Kind:       "Workflow",

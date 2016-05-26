@@ -13,6 +13,7 @@ import (
 	k8sTypes "k8s.io/kubernetes/pkg/types"
 )
 
+// TestValidateWorkflow spec tests the ValidateWorkflowSpec function
 func TestValidateWorkflowSpec(t *testing.T) {
 	successCases := map[string]api.Workflow{
 		"one step, no dependencies": {
@@ -333,12 +334,12 @@ func TestValidateWorkflowSpec(t *testing.T) {
 			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
 				t.Errorf("%v, %v", err.Field, s[0])
 				t.Errorf("unexpected error: %v, expected: %s", err.Error(), s[1])
-				//t.Errorf("unexpected error: %v, expected: %s", err, k)
 			}
 		}
 	}
 }
 
+// NewWorkflow returns a new workflow for testing purposes
 func NewWorkflow() api.Workflow {
 	return api.Workflow{
 		ObjectMeta: k8sApi.ObjectMeta{
@@ -374,6 +375,7 @@ func NewWorkflow() api.Workflow {
 	}
 }
 
+// TestValidateWorkflowUpdate tests the ValidateWorkflowUpdate function
 func TestValidateWorkflowUpdate(t *testing.T) {
 
 	type WorkflowPair struct {

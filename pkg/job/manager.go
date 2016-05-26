@@ -22,20 +22,18 @@ import (
 	k8sClUnv "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
-type JobManager interface {
-	AddJob() error
-	RemoveJob() error
-}
-
+// Manager is responsible for adding and removing jobs to and from the cluster
 type Manager struct {
 	Client    *k8sClUnv.Client
 	Namespace string
 }
 
+// AddJob adds a job to the kubernetes cluster using the client
 func (man *Manager) AddJob(jobConfig *k8sBatch.Job) (job *k8sBatch.Job, err error) {
 	return man.Client.Extensions().Jobs(man.Namespace).Create(jobConfig)
 }
 
+// RemoveJob removes a job from the kubernetes cluster using the client
 func (man *Manager) RemoveJob(jobConfig *k8sBatch.Job) (err error) {
 	deleteOptions := &k8sApi.DeleteOptions{}
 	return man.Client.Extensions().Jobs(man.Namespace).Delete(jobConfig.GetName(), deleteOptions)
