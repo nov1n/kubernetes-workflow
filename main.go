@@ -68,8 +68,7 @@ func main() {
 
 	glog.V(3).Infof("Clients initialized")
 
-	// Start the workflow manager
-	manager := workflow.NewWorkflowManager(oldClient, client, thirdPartyClient, k8sController.NoResyncPeriodFunc)
+	manager := workflow.NewManager(oldClient, client, thirdPartyClient, k8sController.NoResyncPeriodFunc)
 	stopChan := make(chan struct{})
 	manager.Run(5, stopChan)
 	<-stopChan
