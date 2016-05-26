@@ -119,7 +119,7 @@ func NewWorkflowManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface
 			AddFunc: wc.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
 				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
-					// wc.enqueueController(workflow)
+					wc.enqueueController(workflow)
 					// fmt.Println("UPDATE")
 				}
 				glog.V(3).Infof("Update WF old=%v, cur=%v", old.(*api.Workflow), cur.(*api.Workflow))
@@ -227,7 +227,7 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 	workflow := *obj.(*api.Workflow)
 	// Set defaults for workflow
 	if _, ok := workflow.Labels[workflowUID]; !ok {
-		newWorkflow, err := w.setLabels(&workflow)
+		_, err := w.setLabels(&workflow)
 		if err != nil {
 			serr, ok := err.(*k8sApiErr.StatusError)
 			if !ok {
@@ -241,7 +241,6 @@ func (w *WorkflowManager) syncWorkflow(key string) error {
 			}
 			return nil
 		}
-		workflow = *newWorkflow
 	}
 
 	// workflowKey, err := controller.KeyFunc(&workflow)
@@ -363,7 +362,7 @@ func (w *WorkflowManager) enqueueController(obj interface{}) {
 // enqueueAfter enqueues a workflow after a given time.
 // enqueueAfter is non-blocking.
 func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
-	go func() {
+	func() {
 		time.Sleep(d)
 		w.enqueueController(obj)
 	}()
@@ -373,7 +372,7 @@ func (w *WorkflowManager) enqueueAfter(obj interface{}, d time.Duration) {
 // enqueueKeyAfter enqueues a workflow key after a given time.
 // enqueueKeyAfter is non-blocking.
 func (w *WorkflowManager) enqueueKeyAfter(key string, d time.Duration) {
-	go func() {
+	func() {
 		time.Sleep(d)
 		w.queue.Add(key)
 	}()
@@ -507,8 +506,11 @@ func (w *WorkflowManager) manageWorkflowJob(workflow *api.Workflow, stepName str
 			glog.Errorf("Unable to get reference from job %v in step %v of wf %v: %v", job.Name, stepName, workflow.Name, err)
 			return false
 		}
-		oldStatus := workflow.Status.Statuses[stepName]
+		oldStatus, exists := workflow.Status.Statuses[stepName]
 		jobFinished := controller.IsJobFinished(&job)
+		if exists && jobFinished == oldStatus.Complete {
+			return false
+		}
 		workflow.Status.Statuses[stepName] = api.WorkflowStepStatus{
 			Complete:  jobFinished,
 			Reference: *reference}
