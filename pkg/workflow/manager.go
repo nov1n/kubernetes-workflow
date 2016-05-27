@@ -98,7 +98,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 		k8sFrwk.ResourceEventHandlerFuncs{
 			AddFunc: m.enqueueWorkflow,
 			UpdateFunc: func(old, cur interface{}) {
-				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
+				if workflow := cur.(*api.Workflow); !workflow.isFinished() {
 					// TODO: This should be uncommented. For now keep it this way to be consistent with master.
 					m.enqueueWorkflow(workflow)
 				}
