@@ -9,7 +9,7 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/client/cache"
-	"github.com/nov1n/kubernetes-workflow/pkg/controller"
+	"github.com/nov1n/kubernetes-workflow/pkg/job"
 	"github.com/nov1n/kubernetes-workflow/pkg/validation"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	workflowUIDLabel               = "workflow-uid"
 	workflowValidLabel             = "valid"
 	recorderComponent              = "workflow-controller"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
@@ -36,7 +35,7 @@ type Transitioner struct {
 	tpClient *client.ThirdPartyClient
 
 	// jobControl can be used to Create and Delete jobs in the upstream store.
-	jobControl controller.JobControlInterface
+	jobControl job.ControlInterface
 
 	// jobStoreSynced returns true if the jod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -61,7 +60,7 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 
 	return &Transitioner{
 		tpClient: m.tpClient,
-		jobControl: controller.WorkflowJobControl{
+		jobControl: job.Control{
 			KubeClient: m.kubeClient,
 			Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 		},
@@ -70,31 +69,6 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 		jobStore:       &m.jobStore,
 		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 	}
-}
-
-// SetLabels adds the map to the workflow as labels.
-// TODO: move to util
-func setLabels(workflow *api.Workflow, labels map[string]string) {
-	if workflow.Labels == nil {
-		workflow.Labels = make(map[string]string)
-	}
-	for key, value := range labels {
-		workflow.Labels[key] = value
-	}
-}
-
-// TODO: move to util
-func setUID(workflow *api.Workflow) {
-	glog.V(3).Infof("Setting labels on wf %v", workflow.Name)
-	if workflow.Spec.JobsSelector == nil {
-		workflow.Spec.JobsSelector = &k8sApiUnv.LabelSelector{
-			MatchLabels: make(map[string]string),
-		}
-	}
-	setLabels(workflow, map[string]string{
-		workflowUIDLabel: string(workflow.UID),
-	})
-	workflow.Spec.JobsSelector.MatchLabels[workflowUIDLabel] = string(workflow.UID)
 }
 
 // pastActiveDeadline checks if workflow has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -199,8 +173,8 @@ func (t *Transitioner) manageWorkflow(workflow *api.Workflow) bool {
 	needsStatusUpdate := false
 
 	// Set defaults for workflow
-	if _, ok := workflow.Labels[workflowUIDLabel]; !ok {
-		setUID(workflow)
+	if _, ok := workflow.Labels[api.WorkflowUIDLabel]; !ok {
+		workflow.SetUID()
 		needsStatusUpdate = true
 	}
 
@@ -284,7 +258,7 @@ func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string
 	glog.V(3).Infof("Dependencies satisfied for %v", stepName)
 
 	// fetch job by labelSelector and step
-	jobSelector := controller.CreateWorkflowJobLabelSelector(workflow, workflow.Spec.Steps[stepName].JobTemplate, stepName)
+	jobSelector := job.CreateWorkflowJobLabelSelector(workflow, workflow.Spec.Steps[stepName].JobTemplate, stepName)
 	jobList, err := t.jobStore.Jobs(workflow.Namespace).List(jobSelector)
 	if err != nil {
 		panic("Listing jobs on jobStore returned an error. This should not be possible.")
@@ -302,14 +276,14 @@ func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string
 			glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
 		}
 	case 1: // update status
-		job := jobList.Items[0]
-		reference, err := k8sApi.GetReference(&job)
+		curJob := jobList.Items[0]
+		reference, err := k8sApi.GetReference(&curJob)
 		if err != nil || reference == nil {
-			glog.Errorf("Unable to get reference from job %v in step %v of wf %v: %v", job.Name, stepName, workflow.Name, err)
+			glog.Errorf("Unable to get reference from job %v in step %v of wf %v: %v", curJob.Name, stepName, workflow.Name, err)
 			return false
 		}
 		oldStatus, exists := workflow.Status.Statuses[stepName]
-		jobFinished := controller.IsJobFinished(&job)
+		jobFinished := job.IsJobFinished(&curJob)
 		if exists && jobFinished == oldStatus.Complete {
 			return false
 		}
@@ -318,7 +292,7 @@ func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string
 			Reference: *reference,
 		}
 		glog.V(3).Infof("Updated job status from %v to %v for job %v in step %v for wf %v", oldStatus.Complete,
-			workflow.Status.Statuses[stepName].Complete, job.Name, stepName, workflow.Name)
+			workflow.Status.Statuses[stepName].Complete, curJob.Name, stepName, workflow.Name)
 	default: // reconciliate
 		glog.Errorf("WorkflowController.manageWorkfloJob resulted in too many jobs for wf %v. Need reconciliation.", workflow.Name)
 		return false
