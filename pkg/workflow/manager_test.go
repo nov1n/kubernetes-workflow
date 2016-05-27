@@ -427,7 +427,7 @@ func TestControllerSyncWorkflow(t *testing.T) {
 		for _, job := range tc.jobs {
 			manager.jobStore.Store.Add(&job)
 		}
-		_, _, err := manager.transitioner.Transition(getKey(tc.workflow, t))
+		_, _, err := manager.transitioner.transition(getKey(tc.workflow, t))
 		if err != nil {
 			t.Errorf("%s: unexpected error syncing workflow %v", name, err)
 			continue
