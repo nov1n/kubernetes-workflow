@@ -37,6 +37,9 @@ type Transitioner struct {
 	// jobControl can be used to Create and Delete jobs in the upstream store.
 	jobControl job.ControlInterface
 
+	// To allow injection of updateWorkflowStatus for testing.
+	updateHandler func(workflow *api.Workflow) error
+
 	// jobStoreSynced returns true if the jod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	jobStoreSynced func() bool
@@ -58,7 +61,7 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	eventBroadcaster.StartRecordingToSink(&k8sClSetUnv.EventSinkImpl{Interface: m.kubeClient.Core().Events("")})
 
-	return &Transitioner{
+	t := &Transitioner{
 		tpClient: m.tpClient,
 		jobControl: job.Control{
 			KubeClient: m.kubeClient,
@@ -69,6 +72,8 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 		jobStore:       &m.jobStore,
 		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 	}
+	t.updateHandler = t.updateWorkflowStatus
+	return t
 }
 
 // pastActiveDeadline checks if workflow has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -159,7 +164,7 @@ func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.D
 
 	// Try to schedule suitable steps
 	if t.manageWorkflow(&workflow) {
-		if err := t.updateWorkflowStatus(&workflow); err != nil {
+		if err := t.updateHandler(&workflow); err != nil {
 			return true, requeueAfterStatusConflictTime, fmt.Errorf("failed to update workflow %v, requeuing after %v.  Error: %v", workflow.Name, requeueAfterStatusConflictTime, err)
 		}
 	}
