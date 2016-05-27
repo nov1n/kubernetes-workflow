@@ -43,3 +43,44 @@ spec:
                   command:
                     - "/bin/sleep"
                     - "30"
+    step-c:
+      dependencies:
+        - "step-a"
+      jobTemplate:
+        metadata:
+          name: "job3"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod3"
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  image: "ubuntu"
+                  name: "ubuntu3"
+                  command:
+                    - "/bin/sleep"
+                    - "30"
+    step-d:
+      dependencies:
+        - "step-b"
+        - "step-c"
+      jobTemplate:
+        metadata:
+          name: "job4"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod4"
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  image: "ubuntu"
+                  name: "ubuntu4"
+                  command:
+                    - "/bin/sleep"
+                    - "30"
