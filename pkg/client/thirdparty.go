@@ -44,7 +44,7 @@ func NewThirdParty(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) (*ThirdPartyCl
 	if err != nil {
 		return nil, err
 	}
-	baseURL := path.Join(c.Host, c.APIPath, c.GroupVersion.Group, c.GroupVersion.Version)
+	baseURL := c.Host + path.Join(c.APIPath, c.GroupVersion.Group, c.GroupVersion.Version)
 	return &ThirdPartyClient{client, baseURL}, nil
 }
 
