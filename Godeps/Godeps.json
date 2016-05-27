@@ -204,6 +204,21 @@
 			"Rev": "a83829b6f1293c91addabc89d0571c246397bbf4"
 		},
 		{
+			"ImportPath": "k8s.io/kubernetes/federation/apis/federation",
+			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
+			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/federation/apis/federation/install",
+			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
+			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/federation/apis/federation/v1alpha1",
+			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
+			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
+		},
+		{
 			"ImportPath": "k8s.io/kubernetes/pkg/api",
 			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
 			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
@@ -245,6 +260,11 @@
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/api/service",
+			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
+			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/pkg/api/testapi",
 			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
 			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
 		},
@@ -509,16 +529,6 @@
 			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
 		},
 		{
-			"ImportPath": "k8s.io/kubernetes/pkg/controller/framework/informers",
-			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
-			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
-		},
-		{
-			"ImportPath": "k8s.io/kubernetes/pkg/controller/replication",
-			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
-			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
-		},
-		{
 			"ImportPath": "k8s.io/kubernetes/pkg/conversion",
 			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
 			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
@@ -630,11 +640,6 @@
 		},
 		{
 			"ImportPath": "k8s.io/kubernetes/pkg/util/json",
-			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
-			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
-		},
-		{
-			"ImportPath": "k8s.io/kubernetes/pkg/util/metrics",
 			"Comment": "v1.3.0-alpha.4-172-ga9d987c",
 			"Rev": "a9d987cbbf4aee44f1dcd019406ad85b30a54114"
 		},

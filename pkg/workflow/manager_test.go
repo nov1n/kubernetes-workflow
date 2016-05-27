@@ -344,13 +344,13 @@ func TestControllerSyncWorkflow(t *testing.T) {
 		thirdPartyClient := client.NewThirdPartyOrDie(k8sApiUnv.GroupVersion{
 			Group:   "nerdalize.com",
 			Version: "v1alpha1",
-		}, clientConfig)
+		}, *clientConfig)
 
 		manager := NewManager(oldClient, clientset, thirdPartyClient)
 		fakeJobControl := job.FakeControl{}
 		manager.transitioner.jobControl = &fakeJobControl
 		manager.transitioner.jobStoreSynced = func() bool { return true }
-		var actual *k8sApi.Workflow
+		var actual *api.Workflow
 		manager.transitioner.updateHandler = func(workflow *api.Workflow) error {
 			actual = workflow
 			return nil
