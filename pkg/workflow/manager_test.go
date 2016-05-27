@@ -301,7 +301,7 @@ func TestControllerSyncWorkflow(t *testing.T) {
 			},
 			jobs: []k8sBatch.Job{}, // jobs no retrieved step only
 			checkWorkflow: func(testName string, workflow *api.Workflow, t *testing.T) {
-				if !isWorkflowFinished(workflow) {
+				if !workflow.IsFinished() {
 					t.Errorf("%s, Workflow should be finished:\n %#v", testName, workflow)
 				}
 				if workflow.Status.CompletionTime == nil {
@@ -537,8 +537,8 @@ func TestIsWorkflowFinished(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		if isWorkflowFinished(tc.workflow) != tc.finished {
-			t.Errorf("%s - Expected %v got %v", tc.name, tc.finished, isWorkflowFinished(tc.workflow))
+		if tc.workflow.IsFinished() != tc.finished {
+			t.Errorf("%s - Expected %v got %v", tc.name, tc.finished, tc.workflow.IsFinished())
 		}
 	}
 }
