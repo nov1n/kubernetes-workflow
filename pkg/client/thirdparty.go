@@ -17,6 +17,8 @@ limitations under the License.
 package client
 
 import (
+	"path"
+
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
@@ -42,8 +44,7 @@ func NewThirdParty(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) (*ThirdPartyCl
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Use path.join
-	baseURL := c.Host + c.APIPath + "/" + c.GroupVersion.Group + "/" + c.GroupVersion.Version
+	baseURL := c.Host + path.Join(c.APIPath, c.GroupVersion.Group, c.GroupVersion.Version)
 	return &ThirdPartyClient{client, baseURL}, nil
 }
 
@@ -56,7 +57,6 @@ func setThirdPartyDefaults(groupVersion *k8sApiUnv.GroupVersion, config *k8sRest
 
 	config.GroupVersion = groupVersion
 
-	//config.Codec = thirdpartyresourcedata.NewCodec(client.NewExtensions(config).RESTClient.Codec(), gvk.Kind)
 	config.Codec = k8sApi.Codecs.LegacyCodec(*config.GroupVersion)
 	config.NegotiatedSerializer = k8sApi.Codecs
 
