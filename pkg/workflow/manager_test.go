@@ -98,8 +98,8 @@ func getClient(output string) (tpc *client.ThirdPartyClient, err error) {
 		fmt.Fprintln(w, output)
 	}))
 	tpc, err = client.NewThirdParty(k8sApiUnv.GroupVersion{
-		Group:   "nerdalize.com",
-		Version: "v1alpha1",
+		Group:   api.Group,
+		Version: api.Version,
 	}, k8sRestCl.Config{
 		Host: ts.URL,
 	})
@@ -438,8 +438,8 @@ func TestControllerSyncWorkflow(t *testing.T) {
 		clientset := k8sClSet.NewForConfigOrDie(clientConfig)
 		oldClient := k8sCl.NewOrDie(clientConfig)
 		thirdPartyClient := client.NewThirdPartyOrDie(k8sApiUnv.GroupVersion{
-			Group:   "nerdalize.com",
-			Version: "v1alpha1",
+			Group:   api.Group,
+			Version: api.Version,
 		}, *clientConfig)
 
 		manager := NewManager(oldClient, clientset, thirdPartyClient)
