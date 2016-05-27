@@ -35,6 +35,15 @@ import (
 	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
+const (
+	// TODO: Use these constants instead of strings
+
+	// Api path for namespaces
+	namespacesPathString = "namespaces"
+	// Api path for workflows
+	workflowsPathString = "workflows"
+)
+
 // WorkflowsNamespacer has methods to work with Workflow resources in a namespace.
 type WorkflowsNamespacer interface {
 	Workflows(namespace string) WorkflowInterface
