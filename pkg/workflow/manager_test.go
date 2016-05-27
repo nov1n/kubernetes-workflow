@@ -1,8 +1,11 @@
 package workflow
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 	"time"
@@ -34,6 +37,7 @@ func TestFlag(t *testing.T) {
 func newJobTemplateSpec() *k8sBatch.JobTemplateSpec {
 	return &k8sBatch.JobTemplateSpec{
 		ObjectMeta: k8sApi.ObjectMeta{
+			Name: "jobName",
 			Labels: map[string]string{
 				"foo":                "bar",
 				"valid":              "true",
@@ -75,6 +79,31 @@ func newTestWorkflow() *api.Workflow {
 			},
 		},
 	}
+}
+
+// getTestWorkflowList returns a list containing one test workflow.
+func getTestWorkflowList(wf api.Workflow) api.WorkflowList {
+	return api.WorkflowList{
+		TypeMeta: k8sApiUnv.TypeMeta{
+			Kind: "WorkflowList",
+		},
+		Items: []api.Workflow{wf},
+	}
+}
+
+// getClient returns a ThirdPartyClient that always returns the given output string as a response
+// to a request
+func getClient(output string) (tpc *client.ThirdPartyClient, err error) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, output)
+	}))
+	tpc, err = client.NewThirdParty(k8sApiUnv.GroupVersion{
+		Group:   "nerdalize.com",
+		Version: "v1alpha1",
+	}, k8sRestCl.Config{
+		Host: ts.URL,
+	})
+	return
 }
 
 func newJobTemplateStatus() api.WorkflowStepStatus {
@@ -514,20 +543,26 @@ func TestIsWorkflowFinished(t *testing.T) {
 	}
 }
 
-func TestWatchPods(t *testing.T) {
+// TestWatchJobs the case when jobs are added and we get watch events from the server.
+func TestWatchJobs(t *testing.T) {
+	testWorkflow := newTestWorkflow()
+	testList := getTestWorkflowList(*testWorkflow)
+	json, err := json.Marshal(testList)
+	if err != nil {
+		t.Errorf("Error when trying to parse workflow list (%#v): %v", testList, err)
+	}
+	tpc, err := getClient(string(json))
+	if err != nil {
+		t.Error("Error while creating client")
+	}
+
 	clientConfig := &k8sRestCl.Config{Host: "", ContentConfig: k8sRestCl.ContentConfig{GroupVersion: k8sTestApi.Default.GroupVersion()}}
 	oldClient := k8sCl.NewOrDie(clientConfig)
-	thirdPartyClient := client.NewThirdPartyOrDie(k8sApiUnv.GroupVersion{
-		Group:   "nerdalize.com",
-		Version: "v1alpha1",
-	}, *clientConfig)
 	clientset := k8sFake.NewSimpleClientset()
 	fakeWatch := k8sWatch.NewFake()
 	clientset.PrependWatchReactor("jobs", k8sCore.DefaultWatchReactor(fakeWatch, nil))
-	manager := NewManager(oldClient, clientset, thirdPartyClient)
+	manager := NewManager(oldClient, clientset, tpc)
 	manager.jobStoreSynced = func() bool { return true }
-
-	testWorkflow := newTestWorkflow()
 
 	// Put one job and one pod into the store
 	manager.workflowStore.Store.Add(testWorkflow)
@@ -571,3 +606,68 @@ func TestWatchPods(t *testing.T) {
 	t.Log("Waiting for pod to reach syncHandler")
 	<-received
 }
+
+// TestWatchJobs the case when jobs are added and we get watch events from the server.
+// func TestWatchUpdateJobs(t *testing.T) {
+// 	testWorkflow := newTestWorkflow()
+// 	testList := getTestWorkflowList(*testWorkflow)
+// 	json, err := json.Marshal(testList)
+// 	if err != nil {
+// 		t.Errorf("Error when trying to parse workflow list (%#v): %v", testList, err)
+// 	}
+// 	tpc, err := getClient(string(json))
+// 	if err != nil {
+// 		t.Error("Error while creating client")
+// 	}
+//
+// 	clientConfig := &k8sRestCl.Config{Host: "", ContentConfig: k8sRestCl.ContentConfig{GroupVersion: k8sTestApi.Default.GroupVersion()}}
+// 	oldClient := k8sCl.NewOrDie(clientConfig)
+// 	clientset := k8sFake.NewSimpleClientset()
+// 	fakeWatch := k8sWatch.NewFake()
+// 	clientset.PrependWatchReactor("jobs", k8sCore.DefaultWatchReactor(fakeWatch, nil))
+// 	manager := NewManager(oldClient, clientset, tpc)
+// 	manager.jobStoreSynced = func() bool { return true }
+//
+// 	// Put one job and one pod into the store
+// 	manager.workflowStore.Store.Add(testWorkflow)
+// 	received := make(chan struct{})
+// 	// The pod update sent through the fakeWatcher should figure out the managing job and
+// 	// send it into the syncHandler.
+// 	manager.transitioner.transition = func(key string) (bool, time.Duration, error) {
+// 		obj, exists, err := manager.workflowStore.Store.GetByKey(key)
+// 		if !exists || err != nil {
+// 			t.Errorf("Expected to find workflow under key %v", key)
+// 			close(received)
+// 			return false, 0, nil
+// 		}
+// 		workflow, ok := obj.(*api.Workflow)
+// 		if !ok {
+// 			t.Errorf("unexpected type: %v %#v", reflect.TypeOf(obj), obj)
+// 			close(received)
+// 			return false, 0, nil
+// 		}
+// 		if !k8sApi.Semantic.DeepDerivative(workflow, testWorkflow) {
+// 			t.Errorf("\nExpected %#v,\nbut got %#v", testWorkflow, workflow)
+// 			close(received)
+// 			return false, 0, nil
+// 		}
+// 		close(received)
+// 		return false, 0, nil
+// 	}
+// 	// Start only the pod watcher and the workqueue, send a watch event,
+// 	// and make sure it hits the sync method for the right job.
+// 	stopCh := make(chan struct{})
+// 	defer close(stopCh)
+// 	go manager.Run(1, stopCh)
+// 	jobTemplate := newJobTemplateSpec()
+// 	j := &k8sBatch.Job{
+// 		ObjectMeta: jobTemplate.ObjectMeta,
+// 		Spec:       jobTemplate.Spec,
+// 	}
+//
+// 	j.Labels["new"] = "test"
+// 	fakeWatch.Modify(j)
+//
+// 	t.Log("Waiting for pod to reach syncHandler")
+// 	<-received
+// }
