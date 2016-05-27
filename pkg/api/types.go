@@ -17,10 +17,14 @@ limitations under the License.
 package api
 
 import (
+	"github.com/golang/glog"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 )
+
+// WorkflowUIDLabel is a unique label for workflows, used as prefix.
+const WorkflowUIDLabel = "workflow-uid"
 
 // Workflow object representing a single workflow
 type Workflow struct {
@@ -146,4 +150,28 @@ func (wf *WorkflowList) GetObjectKind() k8sApiUnv.ObjectKind {
 		Kind:       "Workflow",
 		APIVersion: "nerdalize.com/v1alpha1",
 	}
+}
+
+// setLabels adds the map to the workflow as labels.
+func (wf *Workflow) setLabels(labels map[string]string) {
+	if wf.Labels == nil {
+		wf.Labels = make(map[string]string)
+	}
+	for key, value := range labels {
+		wf.Labels[key] = value
+	}
+}
+
+// SetUID sets the UID for a workflow.
+func (wf *Workflow) SetUID() {
+	glog.V(3).Infof("Setting labels on wf %v", wf.Name)
+	if wf.Spec.JobsSelector == nil {
+		wf.Spec.JobsSelector = &k8sApiUnv.LabelSelector{
+			MatchLabels: make(map[string]string),
+		}
+	}
+	wf.setLabels(map[string]string{
+		WorkflowUIDLabel: string(wf.UID),
+	})
+	wf.Spec.JobsSelector.MatchLabels[WorkflowUIDLabel] = string(wf.UID)
 }

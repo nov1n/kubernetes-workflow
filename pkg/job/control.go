@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package job
 
 import (
 	"fmt"
@@ -41,19 +41,19 @@ const (
 	codecVersion = "v1"
 )
 
-// JobControlInterface defines methods for JobControl
-type JobControlInterface interface {
+// ControlInterface defines methods for JobControl
+type ControlInterface interface {
 	CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, key string) error
 	DeleteJob(namespace, name string, object k8sRunt.Object) error
 }
 
-// WorkflowJobControl is the workflow implementation of JobControlInterface
-type WorkflowJobControl struct {
+// Control is the workflow implementation of ControlInterface
+type Control struct {
 	KubeClient k8sClSet.Interface
 	Recorder   k8sRec.EventRecorder
 }
 
-var _ JobControlInterface = &WorkflowJobControl{}
+var _ ControlInterface = &Control{}
 
 // getJobsPrefix returns the prefix used for controller names
 func getJobsPrefix(controllerName string) string {
@@ -107,7 +107,7 @@ func CreateWorkflowJobLabelSelector(workflow *api.Workflow, template *k8sBatch.J
 }
 
 // CreateJob creates a job in a workflow
-func (w WorkflowJobControl) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, stepName string) error {
+func (w Control) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, stepName string) error {
 	workflow := object.(*api.Workflow)
 	desiredLabels := getWorkflowJobLabelSet(workflow, template, stepName)
 	desiredAnnotations, err := getJobsAnnotationSet(template, object)
@@ -136,12 +136,12 @@ func (w WorkflowJobControl) CreateJob(namespace string, template *k8sBatch.JobTe
 		w.Recorder.Eventf(object, k8sApi.EventTypeWarning, "FailedCreate", "Error creating: %v", err)
 		return fmt.Errorf("unable to create job: %v", err)
 	}
-	glog.V(3).Infof("Controller %v created job %v", meta.Name, newJob.Name)
+	glog.V(3).Infof("JobControl %v created job %v", meta.Name, newJob.Name)
 	return nil
 }
 
 // DeleteJob deletes a job TODO: Implement this
-func (w WorkflowJobControl) DeleteJob(namespace, jobName string, object k8sRunt.Object) error {
+func (w Control) DeleteJob(namespace, jobName string, object k8sRunt.Object) error {
 	return nil
 }
 
@@ -157,18 +157,18 @@ func IsJobFinished(j *k8sBatch.Job) bool {
 	return false
 }
 
-// FakeJobControl mocks a job control for testing purposes
-type FakeJobControl struct {
+// FakeControl mocks a job control for testing purposes
+type FakeControl struct {
 	sync.Mutex
 	CreatedJobTemplates []k8sBatch.JobTemplateSpec
 	DeletedJobNames     []string
 	Err                 error
 }
 
-var _ JobControlInterface = &FakeJobControl{}
+var _ ControlInterface = &FakeControl{}
 
 // CreateJob simulates creating a job
-func (f *FakeJobControl) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, key string) error {
+func (f *FakeControl) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, key string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.CreatedJobTemplates = append(f.CreatedJobTemplates, *template)
@@ -176,7 +176,7 @@ func (f *FakeJobControl) CreateJob(namespace string, template *k8sBatch.JobTempl
 }
 
 // DeleteJob simulates deleting a job
-func (f *FakeJobControl) DeleteJob(namespace, name string, object k8sRunt.Object) error {
+func (f *FakeControl) DeleteJob(namespace, name string, object k8sRunt.Object) error {
 	f.Lock()
 	defer f.Unlock()
 	if f.Err != nil {
