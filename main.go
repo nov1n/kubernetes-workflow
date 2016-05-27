@@ -26,7 +26,7 @@ import (
 
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/client/restclient"
+	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
@@ -40,7 +40,7 @@ func main() {
 	flag.Parse()
 
 	// Configure host using the cmdline flags
-	clientConfig := restclient.Config{
+	clientConfig := k8sRestCl.Config{
 		Host: "http://" + net.JoinHostPort(*host, *port),
 	}
 

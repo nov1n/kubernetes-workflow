@@ -54,6 +54,19 @@ func NewThirdParty(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) (*ThirdPartyCl
 	return &ThirdPartyClient{client, baseURL}, nil
 }
 
+// NewThirdPartyOrDie returns a new ThirdPartyClient or panics when it encounters an error.
+func NewThirdPartyOrDie(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) *ThirdPartyClient {
+	if err := setThirdPartyDefaults(&gv, &c); err != nil {
+		panic(err)
+	}
+	client, err := k8sRestCl.RESTClientFor(&c)
+	if err != nil {
+		panic(err)
+	}
+	baseURL := c.Host + path.Join(c.APIPath, c.GroupVersion.Group, c.GroupVersion.Version)
+	return &ThirdPartyClient{client, baseURL}
+}
+
 // Configuration for RESTClient
 func setThirdPartyDefaults(groupVersion *k8sApiUnv.GroupVersion, config *k8sRestCl.Config) error {
 	config.APIPath = defaultAPIPath

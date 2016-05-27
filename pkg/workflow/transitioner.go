@@ -37,6 +37,9 @@ type Transitioner struct {
 	// jobControl can be used to Create and Delete jobs in the upstream store.
 	jobControl job.ControlInterface
 
+	// To allow injection of updateWorkflowStatus for testing.
+	updateHandler func(workflow *api.Workflow) error
+
 	// jobStoreSynced returns true if the jod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	jobStoreSynced func() bool
@@ -49,6 +52,8 @@ type Transitioner struct {
 
 	// Recorder records client events
 	recorder k8sRec.EventRecorder
+
+	transition func(string) (bool, time.Duration, error)
 }
 
 // NewTransitionerFor returns a new Transitioner given a Manager.
@@ -58,7 +63,7 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
 	eventBroadcaster.StartRecordingToSink(&k8sClSetUnv.EventSinkImpl{Interface: m.kubeClient.Core().Events("")})
 
-	return &Transitioner{
+	t := &Transitioner{
 		tpClient: m.tpClient,
 		jobControl: job.Control{
 			KubeClient: m.kubeClient,
@@ -69,6 +74,9 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 		jobStore:       &m.jobStore,
 		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 	}
+	t.updateHandler = t.updateWorkflowStatus
+	t.transition = t.transitionWorkflow
+	return t
 }
 
 // pastActiveDeadline checks if workflow has ActiveDeadlineSeconds field set and if it is exceeded.
@@ -124,7 +132,7 @@ func isWorkflowFinished(workflow *api.Workflow) bool {
 
 // Transition transitions a workflow from its current state towards a desired state.
 // It's given a key created by k8sController.KeyFunc.
-func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.Duration, err error) {
+func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfter time.Duration, err error) {
 	glog.V(3).Infoln("Syncing: " + key)
 
 	startTime := time.Now()
@@ -159,7 +167,7 @@ func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.D
 
 	// Try to schedule suitable steps
 	if t.manageWorkflow(&workflow) {
-		if err := t.updateWorkflowStatus(&workflow); err != nil {
+		if err := t.updateHandler(&workflow); err != nil {
 			return true, requeueAfterStatusConflictTime, fmt.Errorf("failed to update workflow %v, requeuing after %v.  Error: %v", workflow.Name, requeueAfterStatusConflictTime, err)
 		}
 	}
@@ -259,6 +267,7 @@ func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string
 
 	// fetch job by labelSelector and step
 	jobSelector := job.CreateWorkflowJobLabelSelector(workflow, workflow.Spec.Steps[stepName].JobTemplate, stepName)
+	glog.V(3).Infof("Selecting jobs using selector %v", jobSelector)
 	jobList, err := t.jobStore.Jobs(workflow.Namespace).List(jobSelector)
 	if err != nil {
 		panic("Listing jobs on jobStore returned an error. This should not be possible.")
