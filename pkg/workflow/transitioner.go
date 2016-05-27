@@ -66,8 +66,8 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 			Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 		},
 		jobStoreSynced: m.jobStoreSynced,
-		workflowStore:  m.workflowStore,
-		jobStore:       m.jobStore,
+		workflowStore:  &m.workflowStore,
+		jobStore:       &m.jobStore,
 		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 	}
 }

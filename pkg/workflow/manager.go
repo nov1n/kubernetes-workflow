@@ -54,12 +54,12 @@ type Manager struct {
 	jobStoreSynced func() bool
 
 	// A store of workflow, populated by the frameworkController
-	workflowStore *cache.StoreToWorkflowLister
+	workflowStore cache.StoreToWorkflowLister
 	// Watches changes to all workflows
 	workflowController *k8sFrwk.Controller
 
 	// Store of job
-	jobStore *cache.StoreToJobLister
+	jobStore cache.StoreToJobLister
 
 	// Watches changes to all jobs
 	jobController *k8sFrwk.Controller
