@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"path"
+
 	"github.com/golang/glog"
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	k8sApi "k8s.io/kubernetes/pkg/api"
@@ -140,16 +142,16 @@ type WorkflowStepStatus struct {
 // GetObjectKind returns a type description of a Workflow
 func (wf *Workflow) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
-		Kind:       "Workflow",
-		APIVersion: "nerdalize.com/v1alpha1",
+		Kind:       api.Kind,
+		APIVersion: path.Join(api.Group, api.Version),
 	}
 }
 
 // GetObjectKind returns a type description of a WorkflowList
 func (wf *WorkflowList) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
-		Kind:       "Workflow",
-		APIVersion: "nerdalize.com/v1alpha1",
+		Kind:       api.Kind,
+		APIVersion: path.Join(api.Group, api.Version),
 	}
 }
 

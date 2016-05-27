@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"path"
 	"strings"
 	"testing"
 	"time"
@@ -108,8 +109,8 @@ func TestValidateWorkflowSpec(t *testing.T) {
 		},
 		"realistic with two steps, one with dependencies": {
 			TypeMeta: k8sApiUnv.TypeMeta{
-				Kind:       "Workflow",
-				APIVersion: "nerdalize.com/v1alpha1",
+				Kind:       api.Kind,
+				APIVersion: path.Join(api.Group, api.Version),
 			},
 			ObjectMeta: k8sApi.ObjectMeta{
 				Name:      "test-workflow",

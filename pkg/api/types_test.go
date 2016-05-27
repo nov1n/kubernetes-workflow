@@ -17,16 +17,19 @@ You may obtain a copy of the License at
 package api
 
 import (
+	"path"
 	"reflect"
 	"testing"
+
+	"github.com/nov1n/kubernetes-workflow/pkg/api"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 var expected = &k8sApiUnv.TypeMeta{
-	Kind:       "Workflow",
-	APIVersion: "nerdalize.com/v1alpha1",
+	Kind:       api.Kind,
+	APIVersion: path.Join(api.Group, api.Version),
 }
 
 func TestWorkflowObjectKind(t *testing.T) {
