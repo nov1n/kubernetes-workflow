@@ -31,6 +31,7 @@ import (
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 )
 
+// TestGetJobsPrefix tests the GetJobsPrefix function
 func TestGetJobsPrefix(t *testing.T) {
 	controllerName := "foo"
 	prefix := getJobsPrefix(controllerName)
@@ -41,6 +42,7 @@ func TestGetJobsPrefix(t *testing.T) {
 	}
 }
 
+// spec is a JobTemplateSpec used for testing purposes
 var spec = &k8sBatch.JobTemplateSpec{
 	ObjectMeta: k8sApi.ObjectMeta{
 		Name: "job1",
@@ -67,6 +69,7 @@ var spec = &k8sBatch.JobTemplateSpec{
 	},
 }
 
+// jobObj is a Job for testing purposes
 var jobObj = &k8sBatch.Job{
 	TypeMeta:   k8sApiUnv.TypeMeta{},
 	ObjectMeta: k8sApi.ObjectMeta{Name: "job1"},
@@ -81,6 +84,7 @@ var jobObj = &k8sBatch.Job{
 	},
 }
 
+// wf is a Workflow for testing purposes
 var wf = &api.Workflow{
 	TypeMeta:   k8sApiUnv.TypeMeta{},
 	ObjectMeta: k8sApi.ObjectMeta{Name: "testworkflow"},
@@ -88,6 +92,7 @@ var wf = &api.Workflow{
 	Status:     api.WorkflowStatus{},
 }
 
+// TestGetJobsAnnotationSet tests the GetJobsAnnotationSet function
 func TestGetJobsAnnotationSet(t *testing.T) {
 	expected := k8sLabels.Set{
 		"kubernetes.io/created-by": `{"kind":"SerializedReference","apiVersion":"v1","reference":{"kind":"Workflow","name":"testworkflow","apiVersion":"nerdalize.com/v1alpha1"}}`,
@@ -104,6 +109,7 @@ func TestGetJobsAnnotationSet(t *testing.T) {
 	}
 }
 
+// TestGetWorkflowJobLabelSet tests the GetWorkflowJobLabelSet function
 func TestGetWorkflowJobLabelSet(t *testing.T) {
 	annotations := getWorkflowJobLabelSet(wf, spec, "foo")
 
@@ -114,10 +120,12 @@ func TestGetWorkflowJobLabelSet(t *testing.T) {
 	}
 }
 
+// TestCreateWorkflowJobLabelSelector tests the CreateWorkflowJobLabelSelector function
 func TestCreateWorkflowJobLabelSelector(t *testing.T) {
 	// This function is tested by kubernetes, see github.com/kubernetes/kubernetes/pkg/labels/selector_test.go
 }
 
+// TestCreateJob tests the CreateJob function
 func TestCreateJob(t *testing.T) {
 	eventBroadcaster := k8sRec.NewBroadcaster()
 	cfg, err := clientset.NewForConfig(&restclient.Config{})
@@ -135,6 +143,7 @@ func TestCreateJob(t *testing.T) {
 	}
 }
 
+// TestDeleteJob tests the DeleteJob function
 func TestDeleteJob(t *testing.T) {
 	eventBroadcaster := k8sRec.NewBroadcaster()
 	cfg, err := clientset.NewForConfig(&restclient.Config{})
@@ -149,6 +158,7 @@ func TestDeleteJob(t *testing.T) {
 	control.DeleteJob("default", "job1", wf) // Not yet implemented
 }
 
+// TestIsJobFinished tests the IsJobFinished function
 func TestIsJobFinished(t *testing.T) {
 	res := IsJobFinished(jobObj)
 	if res {
