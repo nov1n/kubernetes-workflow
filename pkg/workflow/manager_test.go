@@ -3,7 +3,9 @@ package workflow
 import (
 	"flag"
 	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
@@ -14,9 +16,12 @@ import (
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 	k8sClSet "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	k8sFake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
+	k8sCore "k8s.io/kubernetes/pkg/client/testing/core"
 	k8sCl "k8s.io/kubernetes/pkg/client/unversioned"
 	k8sCtl "k8s.io/kubernetes/pkg/controller"
+	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
 var myV = flag.Int("myV", 0, "test")
@@ -30,22 +35,42 @@ func newJobTemplateSpec() *k8sBatch.JobTemplateSpec {
 	return &k8sBatch.JobTemplateSpec{
 		ObjectMeta: k8sApi.ObjectMeta{
 			Labels: map[string]string{
-				"foo": "bar",
+				"foo":                "bar",
+				"valid":              "true",
+				api.WorkflowUIDLabel: "123",
 			},
 		},
 		Spec: k8sBatch.JobSpec{
 			Template: k8sApi.PodTemplateSpec{
 				ObjectMeta: k8sApi.ObjectMeta{
 					Labels: map[string]string{
-						"foo":                "bar",
-						"valid":              "true",
-						api.WorkflowUIDLabel: "123",
+						"foo": "bar",
 					},
 				},
 				Spec: k8sApi.PodSpec{
 					Containers: []k8sApi.Container{
 						{Image: "foo/bar"},
 					},
+				},
+			},
+		},
+	}
+}
+
+func newTestWorkflow() *api.Workflow {
+	return &api.Workflow{
+		ObjectMeta: k8sApi.ObjectMeta{
+			Name:      "mydag",
+			Namespace: k8sApi.NamespaceDefault,
+			Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
+		},
+		Spec: api.WorkflowSpec{
+			JobsSelector: &k8sApiUnv.LabelSelector{
+				MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+			},
+			Steps: map[string]api.WorkflowStep{
+				"myJob": {
+					JobTemplate: newJobTemplateSpec(),
 				},
 			},
 		},
@@ -487,4 +512,62 @@ func TestIsWorkflowFinished(t *testing.T) {
 			t.Errorf("%s - Expected %v got %v", tc.name, tc.finished, isWorkflowFinished(tc.workflow))
 		}
 	}
+}
+
+func TestWatchPods(t *testing.T) {
+	clientConfig := &k8sRestCl.Config{Host: "", ContentConfig: k8sRestCl.ContentConfig{GroupVersion: k8sTestApi.Default.GroupVersion()}}
+	oldClient := k8sCl.NewOrDie(clientConfig)
+	thirdPartyClient := client.NewThirdPartyOrDie(k8sApiUnv.GroupVersion{
+		Group:   "nerdalize.com",
+		Version: "v1alpha1",
+	}, *clientConfig)
+	clientset := k8sFake.NewSimpleClientset()
+	fakeWatch := k8sWatch.NewFake()
+	clientset.PrependWatchReactor("jobs", k8sCore.DefaultWatchReactor(fakeWatch, nil))
+	manager := NewManager(oldClient, clientset, thirdPartyClient)
+	manager.jobStoreSynced = func() bool { return true }
+
+	testWorkflow := newTestWorkflow()
+
+	// Put one job and one pod into the store
+	manager.workflowStore.Store.Add(testWorkflow)
+	received := make(chan struct{})
+	// The pod update sent through the fakeWatcher should figure out the managing job and
+	// send it into the syncHandler.
+	manager.transitioner.transition = func(key string) (bool, time.Duration, error) {
+		obj, exists, err := manager.workflowStore.Store.GetByKey(key)
+		if !exists || err != nil {
+			t.Errorf("Expected to find workflow under key %v", key)
+			close(received)
+			return false, 0, nil
+		}
+		workflow, ok := obj.(*api.Workflow)
+		if !ok {
+			t.Errorf("unexpected type: %v %#v", reflect.TypeOf(obj), obj)
+			close(received)
+			return false, 0, nil
+		}
+		if !k8sApi.Semantic.DeepDerivative(workflow, testWorkflow) {
+			t.Errorf("\nExpected %#v,\nbut got %#v", testWorkflow, workflow)
+			close(received)
+			return false, 0, nil
+		}
+		close(received)
+		return false, 0, nil
+	}
+	// Start only the pod watcher and the workqueue, send a watch event,
+	// and make sure it hits the sync method for the right job.
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	go manager.Run(1, stopCh)
+
+	jobTemplate := newJobTemplateSpec()
+	j := &k8sBatch.Job{
+		ObjectMeta: jobTemplate.ObjectMeta,
+		Spec:       jobTemplate.Spec,
+	}
+	fakeWatch.Add(j)
+
+	t.Log("Waiting for pod to reach syncHandler")
+	<-received
 }

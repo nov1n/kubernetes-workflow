@@ -113,10 +113,10 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 	m.jobStore.Store, m.jobController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
-				return m.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).List(options)
+				return m.kubeClient.Batch().Jobs(k8sApi.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options k8sApi.ListOptions) (k8sWatch.Interface, error) {
-				return m.oldKubeClient.Batch().Jobs(k8sApi.NamespaceAll).Watch(options)
+				return m.kubeClient.Batch().Jobs(k8sApi.NamespaceAll).Watch(options)
 			},
 		},
 		&k8sBatch.Job{},
@@ -157,7 +157,7 @@ func (m *Manager) worker() {
 				return
 			}
 			defer m.queue.Done(key)
-			requeue, requeueAfter, err := m.transitioner.Transition(key.(string))
+			requeue, requeueAfter, err := m.transitioner.transition(key.(string))
 			if err != nil {
 				glog.Errorf("Error syncing workflow: %v", err)
 			}

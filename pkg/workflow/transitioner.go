@@ -52,6 +52,8 @@ type Transitioner struct {
 
 	// Recorder records client events
 	recorder k8sRec.EventRecorder
+
+	transition func(string) (bool, time.Duration, error)
 }
 
 // NewTransitionerFor returns a new Transitioner given a Manager.
@@ -73,6 +75,7 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 	}
 	t.updateHandler = t.updateWorkflowStatus
+	t.transition = t.transitionWorkflow
 	return t
 }
 
@@ -129,7 +132,7 @@ func isWorkflowFinished(workflow *api.Workflow) bool {
 
 // Transition transitions a workflow from its current state towards a desired state.
 // It's given a key created by k8sController.KeyFunc.
-func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.Duration, err error) {
+func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfter time.Duration, err error) {
 	glog.V(3).Infoln("Syncing: " + key)
 
 	startTime := time.Now()
