@@ -17,6 +17,7 @@ You may obtain a copy of the License at
 package api
 
 import (
+	"path"
 	"reflect"
 	"testing"
 
@@ -25,8 +26,8 @@ import (
 )
 
 var expected = &k8sApiUnv.TypeMeta{
-	Kind:       "Workflow",
-	APIVersion: "nerdalize.com/v1alpha1",
+	Kind:       Kind,
+	APIVersion: path.Join(Group, Version),
 }
 
 func TestWorkflowObjectKind(t *testing.T) {

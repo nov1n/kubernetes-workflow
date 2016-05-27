@@ -98,7 +98,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 		k8sFrwk.ResourceEventHandlerFuncs{
 			AddFunc: m.enqueueWorkflow,
 			UpdateFunc: func(old, cur interface{}) {
-				if workflow := cur.(*api.Workflow); !isWorkflowFinished(workflow) {
+				if workflow := cur.(*api.Workflow); !workflow.IsFinished() {
 					// TODO: This should be uncommented. For now keep it this way to be consistent with master.
 					m.enqueueWorkflow(workflow)
 				}
@@ -168,6 +168,7 @@ func (m *Manager) worker() {
 	}
 }
 
+// enqueueWorkflow enqueues a workflow to the workerqueue.
 func (m *Manager) enqueueWorkflow(obj interface{}) {
 	key, err := k8sCtl.KeyFunc(obj)
 	if err != nil {
@@ -200,6 +201,7 @@ func (m *Manager) getJobWorkflow(job *k8sBatch.Job) *api.Workflow {
 	return &workflows[0]
 }
 
+// addJob gets called by the informer when a new job is added in the server.
 func (m *Manager) addJob(obj interface{}) {
 	// type safety enforced by Informer
 	job := obj.(*k8sBatch.Job)
@@ -210,6 +212,8 @@ func (m *Manager) addJob(obj interface{}) {
 	}
 }
 
+// updateJob gets called by the informer when a job is updated in the server
+// or when the reflector does a resync.
 func (m *Manager) updateJob(old, cur interface{}) {
 	// type safety enforced by Informer
 	oldJob := old.(*k8sBatch.Job)
@@ -225,6 +229,7 @@ func (m *Manager) updateJob(old, cur interface{}) {
 	}
 }
 
+// deleteJob gets called by the informer when a job is deleted in the server.
 func (m *Manager) deleteJob(obj interface{}) {
 	// type safety enforced by Informer
 	job, ok := obj.(*k8sBatch.Job)

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"reflect"
 	"testing"
 
@@ -39,8 +40,8 @@ func getTestWorkflow() (api.Workflow, string) {
 	name := "test-workflow"
 	workflow := api.Workflow{
 		TypeMeta: k8sApiUnv.TypeMeta{
-			Kind:       "Workflow",
-			APIVersion: "nerdalize.com/v1alpha1",
+			Kind:       api.Kind,
+			APIVersion: path.Join(api.Group, api.Version),
 		},
 		ObjectMeta: k8sApi.ObjectMeta{
 			Name:      name,
@@ -86,8 +87,8 @@ func getClient(output string) (tpc *ThirdPartyClient, err error) {
 		fmt.Fprintln(w, output)
 	}))
 	tpc, err = NewThirdParty(k8sApiUnv.GroupVersion{
-		Group:   "nerdalize.com",
-		Version: "v1alpha1",
+		Group:   api.Group,
+		Version: api.Version,
 	}, k8sRestCl.Config{
 		Host: ts.URL,
 	})
@@ -103,8 +104,8 @@ func getWatchClient(ch chan string) (tpc *ThirdPartyClient, err error) {
 
 	}))
 	tpc, err = NewThirdParty(k8sApiUnv.GroupVersion{
-		Group:   "nerdalize.com",
-		Version: "v1alpha1",
+		Group:   api.Group,
+		Version: api.Version,
 	}, k8sRestCl.Config{
 		Host: ts.URL,
 	})

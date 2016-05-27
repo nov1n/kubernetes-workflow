@@ -94,6 +94,8 @@ func isWorkflowValid(wf *api.Workflow) bool {
 	return true
 }
 
+// updateWorkflowStatus will try to update a workflow to the server.
+// updateWorkflowStatus will retry 'retryOnStatusConflict' times when an update fails.
 func (t *Transitioner) updateWorkflowStatus(workflow *api.Workflow) error {
 	for i, rv := 0, workflow.ResourceVersion; ; i++ {
 		workflow.ResourceVersion = rv
@@ -116,18 +118,6 @@ func (t *Transitioner) updateWorkflowStatus(workflow *api.Workflow) error {
 		rv = getWorkflow.ResourceVersion
 		glog.V(2).Infof("Tried to update status of wf %v in retry %d/%d, but encountered status error (%v), retrying", workflow.Name, i, retryOnStatusConflict, statusErr)
 	}
-}
-
-func isWorkflowFinished(workflow *api.Workflow) bool {
-	for _, c := range workflow.Status.Conditions {
-		conditionWFFinished := (c.Type == api.WorkflowComplete || c.Type == api.WorkflowFailed)
-		conditionTrue := c.Status == k8sApi.ConditionTrue
-		if conditionWFFinished && conditionTrue {
-			glog.V(3).Infof("Workflow %v finished", workflow.Name)
-			return true
-		}
-	}
-	return false
 }
 
 // Transition transitions a workflow from its current state towards a desired state.
@@ -161,12 +151,12 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	workflow := *obj.(*api.Workflow)
 
 	// If the workflow is finished we don't have to do anything
-	if isWorkflowFinished(&workflow) {
+	if workflow.IsFinished() {
 		return false, 0, nil
 	}
 
 	// Try to schedule suitable steps
-	if t.manageWorkflow(&workflow) {
+	if t.process(&workflow) {
 		if err := t.updateHandler(&workflow); err != nil {
 			return true, requeueAfterStatusConflictTime, fmt.Errorf("failed to update workflow %v, requeuing after %v.  Error: %v", workflow.Name, requeueAfterStatusConflictTime, err)
 		}
@@ -175,7 +165,10 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	return false, 0, nil
 }
 
-func (t *Transitioner) manageWorkflow(workflow *api.Workflow) bool {
+// process a workflow and return whether a status updated is needed.
+// This method set the defaults for a workflow, validate the workflow and
+// process its steps.
+func (t *Transitioner) process(workflow *api.Workflow) bool {
 	glog.V(3).Infof("Manage workflow %v", workflow.Name)
 
 	needsStatusUpdate := false
@@ -230,9 +223,9 @@ func (t *Transitioner) manageWorkflow(workflow *api.Workflow) bool {
 		workflowComplete = false
 		switch {
 		case step.JobTemplate != nil: // Job step
-			needsStatusUpdate = t.manageWorkflowJob(workflow, stepName, &step) || needsStatusUpdate
+			needsStatusUpdate = t.processJobStep(workflow, stepName, &step) || needsStatusUpdate
 		case step.ExternalRef != nil: // external object reference
-			needsStatusUpdate = t.manageWorkflowReference(workflow, stepName, &step) || needsStatusUpdate
+			needsStatusUpdate = t.processExternalReferenceStep(workflow, stepName, &step) || needsStatusUpdate
 		}
 	}
 
@@ -253,8 +246,10 @@ func (t *Transitioner) manageWorkflow(workflow *api.Workflow) bool {
 	return needsStatusUpdate
 }
 
-// manageWorkflowJob manages a Job that is in a step of a workflow.
-func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
+// processJobStep processes a job that holds a reference to a job.
+// This method will create a new job or update a running job's status, given that
+// its dependencies are satisfied.
+func (t *Transitioner) processJobStep(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
 	for _, dependencyName := range step.Dependencies {
 		dependencyStatus, ok := workflow.Status.Statuses[dependencyName]
 		if !ok || !dependencyStatus.Complete {
@@ -309,6 +304,8 @@ func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string
 	return true
 }
 
-func (t *Transitioner) manageWorkflowReference(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
+// processReference processes as sub dag.
+// TODO: Implement this.
+func (t *Transitioner) processExternalReferenceStep(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
 	return false
 }

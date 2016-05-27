@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"github.com/golang/glog"
+	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/workflow"
 
@@ -46,8 +47,8 @@ func main() {
 
 	// Create thirdparty client to manage third party resources
 	thirdPartyClient, err := client.NewThirdParty(k8sApiUnversioned.GroupVersion{
-		Group:   "nerdalize.com",
-		Version: "v1alpha1",
+		Group:   api.Group,
+		Version: api.Version,
 	}, clientConfig)
 	if err != nil {
 		glog.Fatalf("Could not create 3rd party client: %v", err)

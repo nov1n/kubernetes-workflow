@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"path"
+
 	"github.com/golang/glog"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
@@ -139,16 +141,16 @@ type WorkflowStepStatus struct {
 // GetObjectKind returns a type description of a Workflow
 func (wf *Workflow) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
-		Kind:       "Workflow",
-		APIVersion: "nerdalize.com/v1alpha1",
+		Kind:       Kind,
+		APIVersion: path.Join(Group, Version),
 	}
 }
 
 // GetObjectKind returns a type description of a WorkflowList
 func (wf *WorkflowList) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
-		Kind:       "Workflow",
-		APIVersion: "nerdalize.com/v1alpha1",
+		Kind:       Kind,
+		APIVersion: path.Join(Group, Version),
 	}
 }
 
@@ -174,4 +176,17 @@ func (wf *Workflow) SetUID() {
 		WorkflowUIDLabel: string(wf.UID),
 	})
 	wf.Spec.JobsSelector.MatchLabels[WorkflowUIDLabel] = string(wf.UID)
+}
+
+// IsWorkflowFinished returns whether a workflow is finished.
+func (wf *Workflow) IsFinished() bool {
+	for _, c := range wf.Status.Conditions {
+		conditionWFFinished := (c.Type == WorkflowComplete || c.Type == WorkflowFailed)
+		conditionTrue := c.Status == k8sApi.ConditionTrue
+		if conditionWFFinished && conditionTrue {
+			glog.V(3).Infof("Workflow %v finished", wf.Name)
+			return true
+		}
+	}
+	return false
 }
