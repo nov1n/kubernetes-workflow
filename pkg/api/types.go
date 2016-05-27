@@ -18,6 +18,7 @@ package api
 
 import (
 	"github.com/golang/glog"
+	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
@@ -174,4 +175,17 @@ func (wf *Workflow) SetUID() {
 		WorkflowUIDLabel: string(wf.UID),
 	})
 	wf.Spec.JobsSelector.MatchLabels[WorkflowUIDLabel] = string(wf.UID)
+}
+
+// isWorkflowFinished returns whether a workflow is finished.
+func (wf *api.Workflow) isFinished() bool {
+	for _, c := range wf.Status.Conditions {
+		conditionWFFinished := (c.Type == api.WorkflowComplete || c.Type == api.WorkflowFailed)
+		conditionTrue := c.Status == k8sApi.ConditionTrue
+		if conditionWFFinished && conditionTrue {
+			glog.V(3).Infof("Workflow %v finished", wf.Name)
+			return true
+		}
+	}
+	return false
 }

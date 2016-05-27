@@ -120,19 +120,6 @@ func (t *Transitioner) updateWorkflowStatus(workflow *api.Workflow) error {
 	}
 }
 
-// isWorkflowFinished returns whether a workflow is finished.
-func isWorkflowFinished(workflow *api.Workflow) bool {
-	for _, c := range workflow.Status.Conditions {
-		conditionWFFinished := (c.Type == api.WorkflowComplete || c.Type == api.WorkflowFailed)
-		conditionTrue := c.Status == k8sApi.ConditionTrue
-		if conditionWFFinished && conditionTrue {
-			glog.V(3).Infof("Workflow %v finished", workflow.Name)
-			return true
-		}
-	}
-	return false
-}
-
 // Transition transitions a workflow from its current state towards a desired state.
 // It's given a key created by k8sController.KeyFunc.
 func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfter time.Duration, err error) {
@@ -164,7 +151,7 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	workflow := *obj.(*api.Workflow)
 
 	// If the workflow is finished we don't have to do anything
-	if isWorkflowFinished(&workflow) {
+	if workflow.isFinished() {
 		return false, 0, nil
 	}
 
