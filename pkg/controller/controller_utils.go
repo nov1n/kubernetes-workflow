@@ -35,10 +35,10 @@ import (
 
 const (
 	// WorkflowStepLabelKey defines the label assigned to a workflow
-	const WorkflowStepLabelKey = "kubernetes.io/workflow"
+	WorkflowStepLabelKey = "kubernetes.io/workflow"
 
 	// Version of the codec
-	const codecVersion = "v1"
+	codecVersion = "v1"
 )
 
 // JobControlInterface defines methods for JobControl

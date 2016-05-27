@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	apiPath = "/apis"
-	defaultQPS = 5
-	defaultBurst = 10
+	defaultAPIPath = "/apis"
+	defaultQPS     = 5
+	defaultBurst   = 10
 )
 
 // ThirdPartyClient can be used to access third party resources
@@ -55,7 +55,7 @@ func NewThirdParty(gv k8sApiUnv.GroupVersion, c k8sRestCl.Config) (*ThirdPartyCl
 
 // Configuration for RESTClient
 func setThirdPartyDefaults(groupVersion *k8sApiUnv.GroupVersion, config *k8sRestCl.Config) error {
-	config.APIPath = APIPath
+	config.APIPath = defaultAPIPath
 	if config.UserAgent == "" {
 		config.UserAgent = k8sRestCl.DefaultKubernetesUserAgent()
 	}
