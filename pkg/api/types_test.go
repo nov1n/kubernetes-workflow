@@ -21,15 +21,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/nov1n/kubernetes-workflow/pkg/api"
-
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 var expected = &k8sApiUnv.TypeMeta{
-	Kind:       api.Kind,
-	APIVersion: path.Join(api.Group, api.Version),
+	Kind:       Kind,
+	APIVersion: path.Join(Group, Version),
 }
 
 func TestWorkflowObjectKind(t *testing.T) {

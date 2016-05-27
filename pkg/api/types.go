@@ -20,7 +20,6 @@ import (
 	"path"
 
 	"github.com/golang/glog"
-	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
@@ -142,16 +141,16 @@ type WorkflowStepStatus struct {
 // GetObjectKind returns a type description of a Workflow
 func (wf *Workflow) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
-		Kind:       api.Kind,
-		APIVersion: path.Join(api.Group, api.Version),
+		Kind:       Kind,
+		APIVersion: path.Join(Group, Version),
 	}
 }
 
 // GetObjectKind returns a type description of a WorkflowList
 func (wf *WorkflowList) GetObjectKind() k8sApiUnv.ObjectKind {
 	return &k8sApiUnv.TypeMeta{
-		Kind:       api.Kind,
-		APIVersion: path.Join(api.Group, api.Version),
+		Kind:       Kind,
+		APIVersion: path.Join(Group, Version),
 	}
 }
 
@@ -180,9 +179,9 @@ func (wf *Workflow) SetUID() {
 }
 
 // isWorkflowFinished returns whether a workflow is finished.
-func (wf *api.Workflow) isFinished() bool {
+func (wf *Workflow) isFinished() bool {
 	for _, c := range wf.Status.Conditions {
-		conditionWFFinished := (c.Type == api.WorkflowComplete || c.Type == api.WorkflowFailed)
+		conditionWFFinished := (c.Type == WorkflowComplete || c.Type == WorkflowFailed)
 		conditionTrue := c.Status == k8sApi.ConditionTrue
 		if conditionWFFinished && conditionTrue {
 			glog.V(3).Infof("Workflow %v finished", wf.Name)
