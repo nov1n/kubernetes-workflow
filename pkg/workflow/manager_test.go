@@ -1,6 +1,8 @@
 package workflow
 
 import (
+	"flag"
+	"fmt"
 	"testing"
 
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
@@ -17,6 +19,12 @@ import (
 	k8sCtl "k8s.io/kubernetes/pkg/controller"
 )
 
+var myV = flag.Int("myV", 0, "test")
+
+func TestFlag(t *testing.T) {
+	flag.Lookup("v").Value.Set(fmt.Sprint(*myV))
+}
+
 // utility function to create a JobTemplateSpec
 func newJobTemplateSpec() *k8sBatch.JobTemplateSpec {
 	return &k8sBatch.JobTemplateSpec{
@@ -29,7 +37,9 @@ func newJobTemplateSpec() *k8sBatch.JobTemplateSpec {
 			Template: k8sApi.PodTemplateSpec{
 				ObjectMeta: k8sApi.ObjectMeta{
 					Labels: map[string]string{
-						"foo": "bar",
+						"foo":                "bar",
+						"valid":              "true",
+						api.WorkflowUIDLabel: "123",
 					},
 				},
 				Spec: k8sApi.PodSpec{
@@ -75,8 +85,12 @@ func TestControllerSyncWorkflow(t *testing.T) {
 				ObjectMeta: k8sApi.ObjectMeta{
 					Name:      "mydag",
 					Namespace: k8sApi.NamespaceDefault,
+					Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
 				},
 				Spec: api.WorkflowSpec{
+					JobsSelector: &k8sApiUnv.LabelSelector{
+						MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+					},
 					Steps: map[string]api.WorkflowStep{
 						"myJob": {
 							JobTemplate: newJobTemplateSpec(),
@@ -92,8 +106,12 @@ func TestControllerSyncWorkflow(t *testing.T) {
 				ObjectMeta: k8sApi.ObjectMeta{
 					Name:      "mydag",
 					Namespace: k8sApi.NamespaceDefault,
+					Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
 				},
 				Spec: api.WorkflowSpec{
+					JobsSelector: &k8sApiUnv.LabelSelector{
+						MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+					},
 					Steps: map[string]api.WorkflowStep{
 						"myJob": {
 							JobTemplate: newJobTemplateSpec(),
@@ -113,7 +131,9 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Name:      "foo",
 						Namespace: k8sApi.NamespaceDefault,
 						Labels: map[string]string{
-							"foo": "bar",
+							"foo":                    "bar",
+							api.WorkflowUIDLabel:     "123",
+							"valid":                  "true",
 							job.WorkflowStepLabelKey: "myJob",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
@@ -139,8 +159,12 @@ func TestControllerSyncWorkflow(t *testing.T) {
 				ObjectMeta: k8sApi.ObjectMeta{
 					Name:      "mydag",
 					Namespace: k8sApi.NamespaceDefault,
+					Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
 				},
 				Spec: api.WorkflowSpec{
+					JobsSelector: &k8sApiUnv.LabelSelector{
+						MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+					},
 					Steps: map[string]api.WorkflowStep{
 						"myJob": {
 							JobTemplate: newJobTemplateSpec(),
@@ -162,6 +186,8 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Labels: map[string]string{
 							"foo": "bar",
 							job.WorkflowStepLabelKey: "myJob",
+							"valid":                  "true",
+							api.WorkflowUIDLabel:     "123",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
 					},
@@ -193,8 +219,12 @@ func TestControllerSyncWorkflow(t *testing.T) {
 				ObjectMeta: k8sApi.ObjectMeta{
 					Name:      "mydag",
 					Namespace: k8sApi.NamespaceDefault,
+					Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
 				},
 				Spec: api.WorkflowSpec{
+					JobsSelector: &k8sApiUnv.LabelSelector{
+						MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+					},
 					Steps: map[string]api.WorkflowStep{
 						"myJob": {
 							JobTemplate: newJobTemplateSpec(),
@@ -231,8 +261,12 @@ func TestControllerSyncWorkflow(t *testing.T) {
 				ObjectMeta: k8sApi.ObjectMeta{
 					Name:      "mydag",
 					Namespace: k8sApi.NamespaceDefault,
+					Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
 				},
 				Spec: api.WorkflowSpec{
+					JobsSelector: &k8sApiUnv.LabelSelector{
+						MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+					},
 					Steps: map[string]api.WorkflowStep{
 						"one": {
 							JobTemplate: newJobTemplateSpec(),
@@ -277,6 +311,8 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Labels: map[string]string{
 							"foo": "bar",
 							job.WorkflowStepLabelKey: "one",
+							"valid":                  "true",
+							api.WorkflowUIDLabel:     "123",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
 					},
@@ -292,8 +328,12 @@ func TestControllerSyncWorkflow(t *testing.T) {
 				ObjectMeta: k8sApi.ObjectMeta{
 					Name:      "mydag",
 					Namespace: k8sApi.NamespaceDefault,
+					Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
 				},
 				Spec: api.WorkflowSpec{
+					JobsSelector: &k8sApiUnv.LabelSelector{
+						MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+					},
 					Steps: map[string]api.WorkflowStep{
 						"one": {
 							JobTemplate: newJobTemplateSpec(),
@@ -326,6 +366,8 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Labels: map[string]string{
 							"foo": "bar",
 							job.WorkflowStepLabelKey: "one",
+							"valid":                  "true",
+							api.WorkflowUIDLabel:     "123",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
 					},
@@ -372,6 +414,77 @@ func TestControllerSyncWorkflow(t *testing.T) {
 		}
 		if tc.checkWorkflow != nil {
 			tc.checkWorkflow(name, actual, t)
+		}
+	}
+}
+
+func TestIsWorkflowFinished(t *testing.T) {
+	cases := []struct {
+		name     string
+		finished bool
+		workflow *api.Workflow
+	}{
+		{
+			name:     "Complete and True",
+			finished: true,
+			workflow: &api.Workflow{
+				Status: api.WorkflowStatus{
+					Conditions: []api.WorkflowCondition{
+						{
+							Type:   api.WorkflowComplete,
+							Status: k8sApi.ConditionTrue,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "Failed and True",
+			finished: true,
+			workflow: &api.Workflow{
+				Status: api.WorkflowStatus{
+					Conditions: []api.WorkflowCondition{
+						{
+							Type:   api.WorkflowFailed,
+							Status: k8sApi.ConditionTrue,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "Complete and False",
+			finished: false,
+			workflow: &api.Workflow{
+				Status: api.WorkflowStatus{
+					Conditions: []api.WorkflowCondition{
+						{
+							Type:   api.WorkflowComplete,
+							Status: k8sApi.ConditionFalse,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "Failed and False",
+			finished: false,
+			workflow: &api.Workflow{
+				Status: api.WorkflowStatus{
+					Conditions: []api.WorkflowCondition{
+						{
+							Type:   api.WorkflowComplete,
+							Status: k8sApi.ConditionFalse,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		if isWorkflowFinished(tc.workflow) != tc.finished {
+			t.Errorf("%s - Expected %v got %v", tc.name, tc.finished, isWorkflowFinished(tc.workflow))
 		}
 	}
 }

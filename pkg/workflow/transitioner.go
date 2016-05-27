@@ -264,6 +264,7 @@ func (t *Transitioner) manageWorkflowJob(workflow *api.Workflow, stepName string
 
 	// fetch job by labelSelector and step
 	jobSelector := job.CreateWorkflowJobLabelSelector(workflow, workflow.Spec.Steps[stepName].JobTemplate, stepName)
+	glog.V(3).Infof("Selecting jobs using selector %v", jobSelector)
 	jobList, err := t.jobStore.Jobs(workflow.Namespace).List(jobSelector)
 	if err != nil {
 		panic("Listing jobs on jobStore returned an error. This should not be possible.")
