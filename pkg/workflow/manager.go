@@ -35,8 +35,8 @@ import (
 )
 
 const (
-	// FullResyncPeriod is the time it takes for the job store and workflow store
-	// to be resynced. When the stores are resynced all items in it will be
+	// FullResyncPeriod is the time between subsequent resyncs of the job store
+	// and workflow store. When the stores are resynced all items in it will be
 	// requeued in Manager.queue by the controller in the informer.
 	FullResyncPeriod = 10 * time.Minute
 )
@@ -49,7 +49,7 @@ type Manager struct {
 	kubeClient    k8sClSet.Interface
 	tpClient      *client.ThirdPartyClient
 
-	// jobStoreSynced returns true if the jod store has been synced at least once.
+	// jobStoreSynced returns true if the job store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	jobStoreSynced func() bool
 
@@ -83,7 +83,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 	}
 
 	// Create a new Informer to sync the upstream workflow store with
-	// our downstream workflow store.
+	// the downstream workflow store.
 	m.workflowStore.Store, m.workflowController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
@@ -109,7 +109,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 	)
 
 	// Create a new Informer to sync the upstream job store with
-	// our downstream job store.
+	// the downstream job store.
 	m.jobStore.Store, m.jobController = k8sFrwk.NewInformer(
 		&k8sCache.ListWatch{
 			ListFunc: func(options k8sApi.ListOptions) (k8sRunt.Object, error) {
@@ -196,7 +196,6 @@ func (m *Manager) getJobWorkflow(job *k8sBatch.Job) *api.Workflow {
 	}
 	if len(workflows) > 1 {
 		glog.Errorf("more than one workflow found for job %v with labels: %+v", job.Name, job.Labels)
-		//sort.Sort(byCreationTimestamp(jobs))
 	}
 	return &workflows[0]
 }

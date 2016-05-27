@@ -22,6 +22,7 @@ import (
 const (
 	workflowUIDLabel               = "workflow-uid"
 	workflowValidLabel             = "valid"
+	recorderComponent              = "workflow-controller"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
 	retryOnStatusConflict          = 3
@@ -29,7 +30,7 @@ const (
 )
 
 // Transitioner is responsible for transitioning a workflow from its current
-// state to a desired state.
+// state towards a desired state.
 type Transitioner struct {
 	// tpClient is a client for accessing ThirdParty resources.
 	tpClient *client.ThirdPartyClient
@@ -62,12 +63,12 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 		tpClient: m.tpClient,
 		jobControl: controller.WorkflowJobControl{
 			KubeClient: m.kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 		},
 		jobStoreSynced: m.jobStoreSynced,
 		workflowStore:  m.workflowStore,
 		jobStore:       m.jobStore,
-		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "workflow-controller"}),
+		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 	}
 }
 
@@ -147,7 +148,7 @@ func isWorkflowFinished(workflow *api.Workflow) bool {
 	return false
 }
 
-// Transition transitions a workflow from its current state to a desired state.
+// Transition transitions a workflow from its current state towards a desired state.
 // It's given a key created by k8sController.KeyFunc.
 func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.Duration, err error) {
 	glog.V(3).Infoln("Syncing: " + key)
@@ -174,7 +175,7 @@ func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.D
 		return true, 0, err
 	}
 
-	// Cast obj to workflow and dereference it.
+	// Copy workflow fromt the store.
 	workflow := *obj.(*api.Workflow)
 
 	// If the workflow is finished we don't have to do anything
