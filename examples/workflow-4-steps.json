@@ -26,7 +26,7 @@
                     "name": "ubuntu1",
                     "command": [
                       "/bin/sleep",
-                      "30"
+                      "20"
                     ]
                   }
                 ]
@@ -68,7 +68,7 @@
       },
       "step-c": {
         "dependencies": [
-          "step-a"
+          "step-b"
         ],
         "jobTemplate": {
           "metadata": {
@@ -88,7 +88,7 @@
                     "name": "ubuntu3",
                     "command": [
                       "/bin/sleep",
-                      "40"
+                      "20"
                     ]
                   }
                 ]
@@ -99,8 +99,7 @@
       },
       "step-d": {
         "dependencies": [
-          "step-b",
-          "step-c"
+          "step-b"
         ],
         "jobTemplate": {
           "metadata": {
@@ -120,7 +119,70 @@
                     "name": "ubuntu4",
                     "command": [
                       "/bin/sleep",
+                      "40"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "step-e": {
+        "dependencies": [
+          "step-c",
+          "step-d"
+        ],
+        "jobTemplate": {
+          "metadata": {
+            "name": "job5"
+          },
+          "spec": {
+            "parallelism": 1,
+            "template": {
+              "metadata": {
+                "name": "pod5"
+              },
+              "spec": {
+                "restartPolicy": "OnFailure",
+                "containers": [
+                  {
+                    "image": "ubuntu",
+                    "name": "ubuntu5",
+                    "command": [
+                      "/bin/sleep",
                       "20"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "step-f": {
+        "dependencies": [
+          "step-e"
+        ],
+        "jobTemplate": {
+          "metadata": {
+            "name": "job6"
+          },
+          "spec": {
+            "parallelism": 1,
+            "template": {
+              "metadata": {
+                "name": "pod6"
+              },
+              "spec": {
+                "restartPolicy": "OnFailure",
+                "containers": [
+                  {
+                    "image": "ubuntu",
+                    "name": "ubuntu6",
+                    "command": [
+                      "/bin/sleep",
+                      "10"
                     ]
                   }
                 ]
