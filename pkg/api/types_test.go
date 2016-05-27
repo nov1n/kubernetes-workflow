@@ -64,3 +64,35 @@ func TestWorkflowListObjectKind(t *testing.T) {
 		t.Errorf("Error getting WorkflowList objectkind, got %v, expected %v", objKind, expected)
 	}
 }
+
+func TestSetLabels(t *testing.T) {
+	wf := Workflow{
+		TypeMeta:   k8sApiUnv.TypeMeta{},
+		ObjectMeta: k8sApi.ObjectMeta{},
+		Spec:       WorkflowSpec{},
+		Status:     WorkflowStatus{},
+	}
+
+	labels := map[string]string{"foo": "bar"}
+
+	wf.SetLabels(labels)
+
+	if val := wf.Labels["foo"]; val != "bar" {
+		t.Errorf("Error setting labels, expected %v, got %v", labels["foo"], val)
+	}
+}
+
+func TestSetUID(t *testing.T) {
+	wf := Workflow{
+		TypeMeta:   k8sApiUnv.TypeMeta{},
+		ObjectMeta: k8sApi.ObjectMeta{},
+		Spec:       WorkflowSpec{},
+		Status:     WorkflowStatus{},
+	}
+
+	wf.SetUID()
+
+	if val := wf.Labels[WorkflowUIDLabel]; val != string(wf.UID) {
+		t.Errorf("Error setting labels, expected %v, got %v", string(wf.UID), val)
+	}
+}
