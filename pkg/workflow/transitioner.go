@@ -151,7 +151,7 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	workflow := *obj.(*api.Workflow)
 
 	// If the workflow is finished we don't have to do anything
-	if workflow.isFinished() {
+	if workflow.IsFinished() {
 		return false, 0, nil
 	}
 

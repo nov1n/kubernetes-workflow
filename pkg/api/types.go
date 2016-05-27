@@ -178,8 +178,8 @@ func (wf *Workflow) SetUID() {
 	wf.Spec.JobsSelector.MatchLabels[WorkflowUIDLabel] = string(wf.UID)
 }
 
-// isWorkflowFinished returns whether a workflow is finished.
-func (wf *Workflow) isFinished() bool {
+// IsWorkflowFinished returns whether a workflow is finished.
+func (wf *Workflow) IsFinished() bool {
 	for _, c := range wf.Status.Conditions {
 		conditionWFFinished := (c.Type == WorkflowComplete || c.Type == WorkflowFailed)
 		conditionTrue := c.Status == k8sApi.ConditionTrue
