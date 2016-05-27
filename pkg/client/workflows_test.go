@@ -17,100 +17,67 @@ limitations under the License.
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/kylelemons/godebug/pretty"
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	k8sApi "k8s.io/kubernetes/pkg/api"
+	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
 	k8sTypes "k8s.io/kubernetes/pkg/types"
+	k8sWatch "k8s.io/kubernetes/pkg/watch"
 )
 
-// Example response from the server when querying all workflows
-const jsonList = `{"kind": "WorkflowList","items": [
-{
-  "apiVersion": "nerdalize.com/v1alpha1",
-  "kind": "Workflow",
-  "metadata": {
-    "name": "test-workflow",
-	"namespace": "default",
-	"uid": "1uid1cafe"
-  },
-  "spec": {
-    "activeDeadlineSeconds": 3600,
-    "steps": {
-      "step-a": {
-        "jobTemplate": {
-          "metadata": {
-            "name": "job1"
-          },
-          "spec": {
-            "parallelism": 1,
-            "template": {
-              "metadata": {
-                "name": "pod1"
-              },
-              "spec": {
-                "restartPolicy": "OnFailure",
-                "containers": [
-                  {
-                    "image": "ubuntu",
-                    "name": "ubuntu1",
-                    "command": [
-                      "/bin/sleep", "30"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      },
-      "step-b": {
-        "dependencies": [
-          "step-a"
-        ],
-        "jobTemplate": {
-          "metadata": {
-            "name": "job2"
-          },
-          "spec": {
-            "parallelism": 1,
-            "template": {
-              "metadata": {
-                "name": "pod2"
-              },
-              "spec": {
-                "restartPolicy": "OnFailure",
-                "containers": [
-                  {
-                    "image": "ubuntu",
-                    "name": "ubuntu2",
-                    "command": [
-                      "/bin/sleep", "30"
-                    ]
-                  }
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-	"jobsSelector": {
-		"matchLabels": {
-			"a": "b"
-		}
+func getTestWorkflow() (api.Workflow, string) {
+	name := "test-workflow"
+	workflow := api.Workflow{
+		TypeMeta: k8sApiUnv.TypeMeta{
+			Kind:       "Workflow",
+			APIVersion: "nerdalize.com/v1alpha1",
+		},
+		ObjectMeta: k8sApi.ObjectMeta{
+			Name:      name,
+			Namespace: k8sApi.NamespaceDefault,
+			UID:       k8sTypes.UID("1uid1cafe"),
+		},
+		Spec: api.WorkflowSpec{
+			ActiveDeadlineSeconds: func(i int64) *int64 { return &i }(3600),
+			Steps: map[string]api.WorkflowStep{
+				"step-a": api.WorkflowStep{
+					JobTemplate: &k8sBatch.JobTemplateSpec{},
+				},
+				"step-b": api.WorkflowStep{
+					Dependencies: []string{
+						"step-a",
+					},
+					JobTemplate: &k8sBatch.JobTemplateSpec{},
+				},
+			},
+			JobsSelector: &k8sApiUnv.LabelSelector{
+				MatchLabels: map[string]string{"a": "b"},
+			},
+		},
 	}
-  }
+	return workflow, name
 }
-]}`
+
+func getTestWorkflowList() api.WorkflowList {
+	wf, _ := getTestWorkflow()
+	return api.WorkflowList{
+		TypeMeta: k8sApiUnv.TypeMeta{
+			Kind: "WorkflowList",
+		},
+		Items: []api.Workflow{wf},
+	}
+}
 
 // getclient returns a ThirdPartyClient that always returns the given output string as a response
 // to a request
@@ -127,91 +94,31 @@ func getClient(output string) (tpc *ThirdPartyClient, err error) {
 	return
 }
 
+// getclient returns a ThirdPartyClient that always returns the given output string as a response
+// to a request
+func getWatchClient(c1 chan string) (tpc *ThirdPartyClient, err error) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		output := <-c1
+		fmt.Fprintln(w, output)
+
+	}))
+	tpc, err = NewThirdParty(k8sApiUnv.GroupVersion{
+		Group:   "nerdalize.com",
+		Version: "v1alpha1",
+	}, k8sRestCl.Config{
+		Host: ts.URL,
+	})
+	return
+}
+
 // Test list tests whether the json corresponds to the struct structure defined in api/types.go
 func TestList(t *testing.T) {
-	expected := api.WorkflowList{
-		TypeMeta: k8sApiUnv.TypeMeta{
-			Kind: "WorkflowList",
-		},
-		Items: []api.Workflow{api.Workflow{
-			TypeMeta: k8sApiUnv.TypeMeta{
-				Kind:       "Workflow",
-				APIVersion: "nerdalize.com/v1alpha1",
-			},
-			ObjectMeta: k8sApi.ObjectMeta{
-				Name:      "test-workflow",
-				Namespace: k8sApi.NamespaceDefault,
-				UID:       k8sTypes.UID("1uid1cafe"),
-			},
-			Spec: api.WorkflowSpec{
-				ActiveDeadlineSeconds: func(i int64) *int64 { return &i }(3600),
-				Steps: map[string]api.WorkflowStep{
-					"step-a": api.WorkflowStep{
-						JobTemplate: &k8sBatch.JobTemplateSpec{
-							ObjectMeta: k8sApi.ObjectMeta{
-								Name: "job1",
-							},
-							Spec: k8sBatch.JobSpec{
-								Parallelism: func(i int32) *int32 { return &i }(1),
-								Template: k8sApi.PodTemplateSpec{
-									ObjectMeta: k8sApi.ObjectMeta{
-										Name: "pod1",
-									},
-									Spec: k8sApi.PodSpec{
-										RestartPolicy: "OnFailure",
-										Containers: []k8sApi.Container{
-											k8sApi.Container{
-												Name:  "ubuntu1",
-												Image: "ubuntu",
-												Command: []string{
-													"/bin/sleep", "30",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					"step-b": api.WorkflowStep{
-						Dependencies: []string{
-							"step-a",
-						},
-						JobTemplate: &k8sBatch.JobTemplateSpec{
-							ObjectMeta: k8sApi.ObjectMeta{
-								Name: "job2",
-							},
-							Spec: k8sBatch.JobSpec{
-								Parallelism: func(i int32) *int32 { return &i }(1),
-								Template: k8sApi.PodTemplateSpec{
-									ObjectMeta: k8sApi.ObjectMeta{
-										Name: "pod2",
-									},
-									Spec: k8sApi.PodSpec{
-										RestartPolicy: "OnFailure",
-										Containers: []k8sApi.Container{
-											k8sApi.Container{
-												Name:  "ubuntu2",
-												Image: "ubuntu",
-												Command: []string{
-													"/bin/sleep", "30",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				JobsSelector: &k8sApiUnv.LabelSelector{
-					MatchLabels: map[string]string{"a": "b"},
-				},
-			},
-		},
-		},
+	expected := getTestWorkflowList()
+	json, err := json.Marshal(expected)
+	if err != nil {
+		t.Errorf("Error when trying to parse workflow list (%#v): %v", expected, err)
 	}
-	tpc, err := getClient(jsonList)
+	tpc, err := getClient(string(json))
 	if err != nil {
 		t.Error("Error while creating client")
 	}
@@ -222,5 +129,132 @@ func TestList(t *testing.T) {
 	}
 	if !reflect.DeepEqual(list, &expected) {
 		t.Errorf("Returned list doesn't match expected list. Diff: \n%v\n", pretty.Compare(list, &expected))
+	}
+}
+
+// Test Get tests whether the json corresponds to the struct structure defined in api/types.go
+func TestGet(t *testing.T) {
+	expected, workflowName := getTestWorkflow()
+	json, err := json.Marshal(expected)
+	if err != nil {
+		t.Errorf("Error when trying to parse workflow (%#v): %v", expected, err)
+	}
+	tpc, err := getClient(string(json))
+	if err != nil {
+		t.Error("Error while creating client")
+	}
+
+	workflow, err := tpc.Workflows(k8sApi.NamespaceDefault).Get(workflowName)
+	if err != nil {
+		t.Errorf("Error while listing workflows: %v", err)
+	}
+	if !reflect.DeepEqual(workflow, &expected) {
+		t.Errorf("Returned workflow doesn't match expected workflow. Diff: \n%v\n", pretty.Compare(workflow, &expected))
+	}
+}
+
+// TestWatch tests the client's watch function.
+func TestWatch(t *testing.T) {
+	initialList := getTestWorkflowList()
+	patches := map[k8sWatch.EventType]func(api.WorkflowList) api.WorkflowList{
+		k8sWatch.Added: func(w api.WorkflowList) api.WorkflowList {
+			return w
+		},
+		k8sWatch.Modified: func(w api.WorkflowList) api.WorkflowList {
+			var deadline int64 = 42
+			w.Items[0].Spec.ActiveDeadlineSeconds = &deadline
+			return w
+		},
+		k8sWatch.Deleted: func(w api.WorkflowList) api.WorkflowList {
+			w.Items = []api.Workflow{}
+			return w
+		},
+	}
+
+	c := make(chan string, len(patches))
+	tpc, err := getWatchClient(c)
+
+	if err != nil {
+		t.Error("Error while creating client")
+	}
+
+	opts := k8sApi.ListOptions{}
+	ticker := make(chan time.Time)
+	watchClient := newFakeWorkflows(tpc, k8sApi.NamespaceDefault, ticker)
+	watchInterface, err := watchClient.Watch(opts)
+	if err != nil {
+		t.Error("Error watching")
+	}
+	for event, patch := range patches {
+		newList := patch(initialList)
+		newListJSON, err := json.Marshal(newList)
+		if err != nil {
+			t.Errorf("Error when trying to parse patched workflow list (%#v): %v", newList, err)
+		}
+		c <- string(newListJSON)
+		ticker <- time.Now()
+		received := <-watchInterface.ResultChan()
+		if event != received.Type {
+			t.Errorf("Watching expected event %v but got %v", event, received.Type)
+		}
+	}
+}
+
+func TestUpdateSuccess(t *testing.T) {
+	expected, _ := getTestWorkflow()
+	json, err := json.Marshal(expected)
+	if err != nil {
+		t.Errorf("Error when trying to parse workflow (%#v): %v", expected, err)
+	}
+	tpc, err := getClient(string(json))
+	if err != nil {
+		t.Error("Error while creating client")
+	}
+
+	workflow, err := tpc.Workflows(k8sApi.NamespaceDefault).Update(&expected)
+	if err != nil {
+		t.Errorf("Error while updating workflows: %v", err)
+	}
+	if !reflect.DeepEqual(workflow, &expected) {
+		t.Errorf("Returned workflow doesn't match expected workflow. Diff: \n%v\n", pretty.Compare(workflow, &expected))
+	}
+}
+
+func TestUpdateStatusFailure(t *testing.T) {
+	expected := k8sApiErr.NewConflict(k8sApiUnv.GroupResource{}, "test-error", fmt.Errorf("Test error"))
+	json, err := json.Marshal(expected.ErrStatus)
+	if err != nil {
+		t.Errorf("Error when trying to parse workflow (%#v): %v", expected, err)
+	}
+	tpc, err := getClient(string(json))
+	if err != nil {
+		t.Error("Error while creating client")
+	}
+
+	workflow, _ := getTestWorkflow()
+	_, err = tpc.Workflows(k8sApi.NamespaceDefault).Update(&workflow)
+	if err != nil {
+		if serr, ok := err.(*k8sApiErr.StatusError); ok {
+			if !reflect.DeepEqual(serr, expected) {
+				t.Errorf("Returned status error doesn't match expected status error. Diff: \n%v\n", pretty.Compare(serr, expected))
+			}
+			return
+		}
+	}
+	t.Errorf("Expected status error but got: %v", err)
+}
+
+func TestUpdateNoName(t *testing.T) {
+	expectedError := "no name found in workflow"
+	tpc, err := getClient("")
+	if err != nil {
+		t.Error("Error while creating client")
+	}
+
+	workflow, _ := getTestWorkflow()
+	workflow.Name = ""
+	_, err = tpc.Workflows(k8sApi.NamespaceDefault).Update(&workflow)
+	if err == nil || err.Error() != expectedError {
+		t.Errorf("Expected error message %v, but got %v", expectedError, err)
 	}
 }

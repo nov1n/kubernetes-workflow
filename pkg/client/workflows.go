@@ -42,6 +42,8 @@ const (
 	namespacesPathString = "namespaces"
 	// Api path for workflows
 	workflowsPathString = "workflows"
+	// WatchInterval is the time between relists to mock watching functionality.
+	WatchInterval = time.Millisecond * 1000
 )
 
 // WorkflowsNamespacer has methods to work with Workflow resources in a namespace.
@@ -53,44 +55,40 @@ type WorkflowsNamespacer interface {
 type WorkflowInterface interface {
 	List(opts k8sApi.ListOptions) (*api.WorkflowList, error)
 	Get(name string) (*api.Workflow, error)
-	// Delete(name string, options *api.DeleteOptions) error
-	// Create(pod *api.Pod) (*api.Pod, error)
 	Update(workflow *api.Workflow) (*api.Workflow, error)
 	Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error)
-	// Bind(binding *api.Binding) error
-	UpdateStatus(workflow *api.Workflow) (*api.Workflow, error)
-	// GetLogs(name string, opts *api.PodLogOptions) *restclient.Request
 }
 
 // workflows implements WorkflowsNamespacer interface
 type workflows struct {
-	client  *ThirdPartyClient
-	ns      string
-	nameMap map[string]api.Workflow
+	client      *ThirdPartyClient
+	ns          string
+	watchTicker <-chan time.Time
+	nameMap     map[string]api.Workflow
 }
 
 // newWorkflows returns a new workflows object given a client and a namespace
 func newWorkflows(c *ThirdPartyClient, namespace string) *workflows {
+	ticker := time.NewTicker(WatchInterval)
 	return &workflows{
-		client:  c,
-		ns:      namespace,
-		nameMap: make(map[string]api.Workflow),
+		client:      c,
+		ns:          namespace,
+		watchTicker: ticker.C,
+		nameMap:     make(map[string]api.Workflow),
+	}
+}
+
+func newFakeWorkflows(c *ThirdPartyClient, namespace string, ticker chan time.Time) *workflows {
+	return &workflows{
+		client:      c,
+		ns:          namespace,
+		watchTicker: ticker,
+		nameMap:     make(map[string]api.Workflow),
 	}
 }
 
 // Update updates the given workflow in the cluster
 func (w *workflows) Update(workflow *api.Workflow) (result *api.Workflow, err error) {
-	return w.UpdateWithSubresource(workflow, "")
-}
-
-// UpdateStatus updates the status field for a given workflow TODO: Is this correct?
-func (w *workflows) UpdateStatus(workflow *api.Workflow) (result *api.Workflow, err error) {
-	return w.UpdateWithSubresource(workflow, "")
-}
-
-// UpdateWithSubresource updates a given workflows subresource by communicating with the kubernetes
-// API server through the client
-func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource string) (result *api.Workflow, err error) {
 	nsPath := ""
 	if w.ns != "" {
 		nsPath = path.Join("namespaces", w.ns)
@@ -98,7 +96,8 @@ func (w *workflows) UpdateWithSubresource(workflow *api.Workflow, subresource st
 	if workflow.Name == "" {
 		return nil, fmt.Errorf("no name found in workflow")
 	}
-	url := createURL(w.client.baseURL, nsPath, "workflows", workflow.Name, subresource)
+
+	url := createURL(w.client.baseURL, nsPath, "workflows", workflow.Name)
 	b, err := json.Marshal(workflow)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't encode workflow: %v", err)
@@ -166,9 +165,8 @@ func (w *workflows) Get(name string) (result *api.Workflow, err error) {
 // Watch returns a watch.Interface that watches the requested workflows.
 func (w *workflows) Watch(opts k8sApi.ListOptions) (k8sWatch.Interface, error) {
 	watcher := watch.NewThirdPartyWatcher()
-	ticker := time.NewTicker(time.Millisecond * 1000)
 	go func() {
-		for range ticker.C {
+		for range w.watchTicker {
 			list, err := w.List(opts)
 			if err != nil {
 				// TODO: Do logging

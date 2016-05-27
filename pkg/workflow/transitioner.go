@@ -89,7 +89,7 @@ func isWorkflowValid(wf *api.Workflow) bool {
 func (t *Transitioner) updateWorkflowStatus(workflow *api.Workflow) error {
 	for i, rv := 0, workflow.ResourceVersion; ; i++ {
 		workflow.ResourceVersion = rv
-		_, updateErr := t.tpClient.Workflows(workflow.Namespace).UpdateStatus(workflow)
+		_, updateErr := t.tpClient.Workflows(workflow.Namespace).Update(workflow)
 		if updateErr == nil {
 			glog.V(2).Infof("Updated status of wf %v successfully", workflow.Name)
 			return nil
