@@ -34,6 +34,7 @@ import (
 	k8sTypes "k8s.io/kubernetes/pkg/types"
 )
 
+// getTestWorkflow returns a test workflow.
 func getTestWorkflow() (api.Workflow, string) {
 	name := "test-workflow"
 	workflow := api.Workflow{
@@ -67,6 +68,7 @@ func getTestWorkflow() (api.Workflow, string) {
 	return workflow, name
 }
 
+// getTestWorkflowList returns a list containing one test workflow.
 func getTestWorkflowList() api.WorkflowList {
 	wf, _ := getTestWorkflow()
 	return api.WorkflowList{
@@ -77,7 +79,7 @@ func getTestWorkflowList() api.WorkflowList {
 	}
 }
 
-// getclient returns a ThirdPartyClient that always returns the given output string as a response
+// getClient returns a ThirdPartyClient that always returns the given output string as a response
 // to a request
 func getClient(output string) (tpc *ThirdPartyClient, err error) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -92,11 +94,11 @@ func getClient(output string) (tpc *ThirdPartyClient, err error) {
 	return
 }
 
-// getclient returns a ThirdPartyClient that always returns the given output string as a response
-// to a request
-func getWatchClient(c1 chan string) (tpc *ThirdPartyClient, err error) {
+// getWatchClient returns a ThirdPartyClient that always writes whatever it
+// receives on ch as a response to a request.
+func getWatchClient(ch chan string) (tpc *ThirdPartyClient, err error) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		output := <-c1
+		output := <-ch
 		fmt.Fprintln(w, output)
 
 	}))
@@ -109,7 +111,7 @@ func getWatchClient(c1 chan string) (tpc *ThirdPartyClient, err error) {
 	return
 }
 
-// Test list tests whether the json corresponds to the struct structure defined in api/types.go
+// TestList tests whether the json corresponds to the struct structure defined in api/types.go
 func TestList(t *testing.T) {
 	expected := getTestWorkflowList()
 	json, err := json.Marshal(expected)
@@ -130,7 +132,7 @@ func TestList(t *testing.T) {
 	}
 }
 
-// Test Get tests whether the json corresponds to the struct structure defined in api/types.go
+// TestGet tests whether the json corresponds to the struct structure defined in api/types.go
 func TestGet(t *testing.T) {
 	expected, workflowName := getTestWorkflow()
 	json, err := json.Marshal(expected)
@@ -199,6 +201,7 @@ func TestGet(t *testing.T) {
 // 	}
 // }
 
+// TestUpdateSuccess tests for a succesfull client update.
 func TestUpdateSuccess(t *testing.T) {
 	expected, _ := getTestWorkflow()
 	json, err := json.Marshal(expected)
@@ -219,6 +222,8 @@ func TestUpdateSuccess(t *testing.T) {
 	}
 }
 
+// TestUpdateStatusFailure tests the case when the server returns a status
+// error when a workflow is updated.
 func TestUpdateStatusFailure(t *testing.T) {
 	expected := k8sApiErr.NewConflict(k8sApiUnv.GroupResource{}, "test-error", fmt.Errorf("Test error"))
 	json, err := json.Marshal(expected.ErrStatus)
@@ -243,6 +248,8 @@ func TestUpdateStatusFailure(t *testing.T) {
 	t.Errorf("Expected status error but got: %v", err)
 }
 
+// TestUpdateNoName tests the case when Update should return an error because
+// the given workflow has no name.
 func TestUpdateNoName(t *testing.T) {
 	expectedError := "no name found in workflow"
 	tpc, err := getClient("")
