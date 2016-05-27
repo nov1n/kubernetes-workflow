@@ -29,7 +29,7 @@ var expected = &k8sApiUnv.TypeMeta{
 	APIVersion: "nerdalize.com/v1alpha1",
 }
 
-func WorkflowObjectKindTest(t *testing.T) {
+func TestWorkflowObjectKind(t *testing.T) {
 	wf := Workflow{
 		TypeMeta:   k8sApiUnv.TypeMeta{},
 		ObjectMeta: k8sApi.ObjectMeta{},
@@ -44,7 +44,7 @@ func WorkflowObjectKindTest(t *testing.T) {
 	}
 }
 
-func WorkflowListObjectKindTest(t *testing.T) {
+func TestWorkflowListObjectKind(t *testing.T) {
 	wfList := WorkflowList{
 		TypeMeta: k8sApiUnv.TypeMeta{},
 		ListMeta: k8sApiUnv.ListMeta{},
