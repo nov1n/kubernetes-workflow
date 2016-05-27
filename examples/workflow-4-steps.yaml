@@ -42,7 +42,7 @@ spec:
                   name: "ubuntu2"
                   command:
                     - "/bin/sleep"
-                    - "30"
+                    - "20"
     step-c:
       dependencies:
         - "step-a"
@@ -62,7 +62,7 @@ spec:
                   name: "ubuntu3"
                   command:
                     - "/bin/sleep"
-                    - "30"
+                    - "40"
     step-d:
       dependencies:
         - "step-b"
@@ -83,4 +83,4 @@ spec:
                   name: "ubuntu4"
                   command:
                     - "/bin/sleep"
-                    - "30"
+                    - "20"

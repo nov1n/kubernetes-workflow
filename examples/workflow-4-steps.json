@@ -57,7 +57,7 @@
                     "name": "ubuntu2",
                     "command": [
                       "/bin/sleep",
-                      "30"
+                      "20"
                     ]
                   }
                 ]
@@ -88,7 +88,7 @@
                     "name": "ubuntu3",
                     "command": [
                       "/bin/sleep",
-                      "30"
+                      "40"
                     ]
                   }
                 ]
@@ -120,7 +120,7 @@
                     "name": "ubuntu4",
                     "command": [
                       "/bin/sleep",
-                      "30"
+                      "20"
                     ]
                   }
                 ]
