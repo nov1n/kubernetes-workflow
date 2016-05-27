@@ -147,12 +147,6 @@ func isWorkflowFinished(workflow *api.Workflow) bool {
 	return false
 }
 
-type RequeueAction struct{}
-type RequeueAfterAction struct {
-	duration time.Duration
-}
-type NeedsStatusUpdateAction struct{}
-
 // Transition transitions a workflow from its current state to a desired state.
 // It's given a key created by k8sController.KeyFunc.
 func (t *Transitioner) Transition(key string) (requeue bool, requeueAfter time.Duration, err error) {
