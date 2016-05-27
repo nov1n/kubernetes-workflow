@@ -28,7 +28,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
-	k8sController "k8s.io/kubernetes/pkg/controller"
 )
 
 func main() {
@@ -68,8 +67,7 @@ func main() {
 
 	glog.V(3).Infof("Clients initialized")
 
-	// Start the workflow manager
-	manager := workflow.NewWorkflowManager(oldClient, client, thirdPartyClient, k8sController.NoResyncPeriodFunc)
+	manager := workflow.NewManager(oldClient, client, thirdPartyClient)
 	stopChan := make(chan struct{})
 	manager.Run(5, stopChan)
 	<-stopChan
