@@ -1,20 +1,4 @@
-/*
-Copyright 2016 The Kubernetes Authors All rights reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package job
+package control
 
 import (
 	"fmt"
@@ -42,18 +26,18 @@ const (
 )
 
 // ControlInterface defines methods for JobControl
-type ControlInterface interface {
+type JobInterface interface {
 	CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, key string) error
 	DeleteJob(namespace, name string, object k8sRunt.Object) error
 }
 
 // Control is the workflow implementation of ControlInterface
-type Control struct {
+type Job struct {
 	KubeClient k8sClSet.Interface
 	Recorder   k8sRec.EventRecorder
 }
 
-var _ ControlInterface = &Control{}
+var _ JobInterface = &Job{}
 
 // getJobsPrefix returns the prefix used for controller names
 func getJobsPrefix(controllerName string) string {
@@ -107,7 +91,7 @@ func CreateWorkflowJobLabelSelector(workflow *api.Workflow, template *k8sBatch.J
 }
 
 // CreateJob creates a job in a workflow
-func (w Control) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, stepName string) error {
+func (w Job) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, stepName string) error {
 	workflow := object.(*api.Workflow)
 	desiredLabels := getWorkflowJobLabelSet(workflow, template, stepName)
 	desiredAnnotations, err := getJobsAnnotationSet(template, object)
@@ -141,7 +125,7 @@ func (w Control) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec,
 }
 
 // DeleteJob deletes a job TODO: Implement this
-func (w Control) DeleteJob(namespace, jobName string, object k8sRunt.Object) error {
+func (w Job) DeleteJob(namespace, jobName string, object k8sRunt.Object) error {
 	return nil
 }
 
@@ -165,7 +149,7 @@ type FakeControl struct {
 	Err                 error
 }
 
-var _ ControlInterface = &FakeControl{}
+var _ JobInterface = &FakeControl{}
 
 // CreateJob simulates creating a job
 func (f *FakeControl) CreateJob(namespace string, template *k8sBatch.JobTemplateSpec, object k8sRunt.Object, key string) error {

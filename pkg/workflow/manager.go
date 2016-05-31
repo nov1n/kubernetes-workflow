@@ -24,7 +24,6 @@ import (
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 	k8sCache "k8s.io/kubernetes/pkg/client/cache"
 	k8sClSet "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	k8sCl "k8s.io/kubernetes/pkg/client/unversioned"
 	k8sCtl "k8s.io/kubernetes/pkg/controller"
 	k8sFrwk "k8s.io/kubernetes/pkg/controller/framework"
 	k8sRunt "k8s.io/kubernetes/pkg/runtime"
@@ -45,9 +44,8 @@ const (
 // Manager has a finite amount of workers which pick workflows waiting to be
 // processed from a queue and hands them over to the Transitioner.
 type Manager struct {
-	oldKubeClient k8sCl.Interface
-	kubeClient    k8sClSet.Interface
-	tpClient      *client.ThirdPartyClient
+	kubeClient k8sClSet.Interface
+	tpClient   *client.ThirdPartyClient
 
 	// jobStoreSynced returns true if the job store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -68,18 +66,19 @@ type Manager struct {
 	queue *k8sWq.Type
 
 	transitioner *Transitioner
+	syncer       *Syncer
 }
 
 // NewManager creates a new Manager and returns it.
 // NewManager creates two Informers to sync the upstream job store and the upstream
 // workflow store with a downstream job store and a downstream workflow store.
 // NewManager also creates a Transitioner which is used for transitioning workflows.
-func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClient *client.ThirdPartyClient) *Manager {
+func NewManager(kubeClient k8sClSet.Interface, tpClient *client.ThirdPartyClient) *Manager {
 	m := &Manager{
-		oldKubeClient: oldClient,
-		kubeClient:    kubeClient,
-		tpClient:      tpClient,
-		queue:         k8sWq.New(),
+		kubeClient: kubeClient,
+		tpClient:   tpClient,
+		queue:      k8sWq.New(),
+		syncer:     NewSyncer(kubeClient, tpClient),
 	}
 
 	// Create a new Informer to sync the upstream workflow store with
@@ -157,15 +156,53 @@ func (m *Manager) worker() {
 				return
 			}
 			defer m.queue.Done(key)
-			requeue, requeueAfter, err := m.transitioner.transition(key.(string))
-			if err != nil {
-				glog.Errorf("Error syncing workflow: %v", err)
+			if m.preConditionsMet(key) {
+				obj, _, _ := m.workflowStore.Store.GetByKey(key)
+				old := *obj.(*api.Workflow)
+				new := m.transitioner.transition(old)
+				m.syncer.sync(&old, &new)
+				// if err != nil {
+				// 	glog.Errorf("Error syncing workflow: %v", err)
+				// }
+				// if requeue {
+				// 	m.enqueueAfter(key.(string), requeueAfter)
+				// }
 			}
-			if requeue {
-				m.enqueueAfter(key.(string), requeueAfter)
-			}
+			// TODO: CHECK FOR REQUEU
 		}()
 	}
+}
+
+// preconditionsMet checks whether a workflow, specified by it's key,
+// can be processed.
+func (m *Manager) preconditionsMet(key string) bool {
+	// Check if the jobStore is synced yet (initialized)
+	if !m.jobStoreSynced() {
+		glog.V(3).Infof("Waiting for job controller to sync, requeuing workflow %v", key)
+		return false
+	}
+
+	// Obtain the workflow object from store by key
+	obj, exists, err := m.workflowStore.Store.GetByKey(key)
+	if !exists {
+		glog.V(3).Infof("Workflow has been deleted: %v", key)
+		return false
+	}
+	if err != nil {
+		glog.Errorf("Unable to retrieve workflow %v from store: %v", key, err)
+		return true
+	}
+
+	// Copy workflow fromt the store.
+	workflow := *obj.(*api.Workflow)
+
+	// If the workflow is finished we don't have to do anything
+	if workflow.IsFinished() {
+		return false
+	}
+
+	// all preconditions are met
+	return true
 }
 
 // enqueueWorkflow enqueues a workflow to the workerqueue.

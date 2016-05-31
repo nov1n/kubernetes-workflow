@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package job
+package control
 
 import (
 	"strings"
@@ -132,7 +132,7 @@ func TestCreateJob(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not create config: %v", err)
 	}
-	control := Control{
+	control := Job{
 		KubeClient: cfg,
 		Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "rec"}),
 	}
@@ -150,7 +150,7 @@ func TestDeleteJob(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not create config: %v", err)
 	}
-	control := Control{
+	control := Job{
 		KubeClient: cfg,
 		Recorder:   eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: "rec"}),
 	}
