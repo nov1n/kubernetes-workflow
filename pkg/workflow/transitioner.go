@@ -12,11 +12,9 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/job"
 	"github.com/nov1n/kubernetes-workflow/pkg/validation"
 	k8sApi "k8s.io/kubernetes/pkg/api"
-	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sClSetUnv "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	k8sRec "k8s.io/kubernetes/pkg/client/record"
-	k8sUtRunt "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 const (
@@ -94,143 +92,73 @@ func isWorkflowValid(wf *api.Workflow) bool {
 	return true
 }
 
-// updateWorkflowStatus will try to update a workflow to the server.
-// updateWorkflowStatus will retry 'retryOnStatusConflict' times when an update fails.
-func (t *Transitioner) updateWorkflowStatus(workflow *api.Workflow) error {
-	for i, rv := 0, workflow.ResourceVersion; ; i++ {
-		workflow.ResourceVersion = rv
-		_, updateErr := t.tpClient.Workflows(workflow.Namespace).Update(workflow)
-		if updateErr == nil {
-			glog.V(2).Infof("Updated status of wf %v successfully", workflow.Name)
-			return nil
-		}
-		if i >= retryOnStatusConflict {
-			return fmt.Errorf("tried to update status of wf %v, but amount of retries (%d) exceeded", workflow.Name, retryOnStatusConflict)
-		}
-		statusErr, ok := updateErr.(*k8sApiErr.StatusError)
-		if !ok {
-			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, updateErr)
-		}
-		getWorkflow, getErr := t.tpClient.Workflows(workflow.Namespace).Get(workflow.Name)
-		if getErr != nil {
-			return fmt.Errorf("tried to update status of wf %v in retry %d/%d, but got error: %v", workflow.Name, i, retryOnStatusConflict, getErr)
-		}
-		rv = getWorkflow.ResourceVersion
-		glog.V(2).Infof("Tried to update status of wf %v in retry %d/%d, but encountered status error (%v), retrying", workflow.Name, i, retryOnStatusConflict, statusErr)
-	}
-}
-
-// Transition transitions a workflow from its current state towards a desired state.
-// It's given a key created by k8sController.KeyFunc.
-func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfter time.Duration, err error) {
-	glog.V(3).Infoln("Syncing: " + key)
+// transitionWorkflow returns a copy of the supplied workflow transitioned
+// towards the desired state. It does not carry out the updates.
+// This method sets defaults, does validation and processes its steps.
+func (t *Transitioner) transitionWorkflow(wf api.Workflow) api.Workflow {
+	glog.V(3).Infoln("Transitioning: " + wf.Name)
 
 	startTime := time.Now()
 	defer func() {
-		glog.V(3).Infof("Finished syncing workflow %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(3).Infof("Finished workflow transition for: %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	// Check if the jobStore is synced yet (initialized)
-	if !t.jobStoreSynced() {
-		glog.V(3).Infof("Waiting for job controller to sync, requeuing workflow %v", key)
-		return true, requeueJobstoreNotSyncedTime, nil
-	}
-
-	// Obtain the workflow object from store by key
-	obj, exists, err := t.workflowStore.Store.GetByKey(key)
-	if !exists {
-		glog.V(3).Infof("Workflow has been deleted: %v", key)
-		return false, 0, nil
-	}
-	if err != nil {
-		glog.Errorf("Unable to retrieve workflow %v from store: %v", key, err)
-		return true, 0, err
-	}
-
-	// Copy workflow fromt the store.
-	workflow := *obj.(*api.Workflow)
-
-	// If the workflow is finished we don't have to do anything
-	if workflow.IsFinished() {
-		return false, 0, nil
-	}
-
-	// Try to schedule suitable steps
-	if t.process(&workflow) {
-		if err := t.updateHandler(&workflow); err != nil {
-			return true, requeueAfterStatusConflictTime, fmt.Errorf("failed to update workflow %v, requeuing after %v.  Error: %v", workflow.Name, requeueAfterStatusConflictTime, err)
-		}
-	}
-
-	return false, 0, nil
-}
-
-// process a workflow and return whether a status updated is needed.
-// This method set the defaults for a workflow, validate the workflow and
-// process its steps.
-func (t *Transitioner) process(workflow *api.Workflow) bool {
-	glog.V(3).Infof("Manage workflow %v", workflow.Name)
-
-	needsStatusUpdate := false
-
 	// Set defaults for workflow
-	if _, ok := workflow.Labels[api.WorkflowUIDLabel]; !ok {
-		workflow.SetUID()
-		needsStatusUpdate = true
+	if _, ok := wf.Labels[api.WorkflowUIDLabel]; !ok {
+		wf.SetUID()
 	}
 
 	// Create empty status map
-	if workflow.Status.Statuses == nil {
-		glog.V(3).Infof("Setting status for workflow %v", workflow.Name)
-		workflow.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(workflow.Spec.Steps))
+	if wf.Status.Statuses == nil {
+		glog.V(3).Infof("Setting status for workflow %v", wf.Name)
+		wf.Status.Statuses = make(map[string]api.WorkflowStepStatus, len(wf.Spec.Steps))
 		now := k8sApiUnv.Now()
-		workflow.Status.StartTime = &now
-		needsStatusUpdate = true
+		wf.Status.StartTime = &now
 	}
 
 	// Check if workflow has been validated
-	if wasValid, ok := workflow.Labels[workflowValidLabel]; !ok || wasValid == falseString {
+	if wasValid, ok := wf.Labels[workflowValidLabel]; !ok || wasValid == falseString {
 		// Workflow has either not yet been validated or was invalid
 
 		// Check if workflow is valid
 		isValid := strconv.FormatBool(isWorkflowValid(workflow))
-		workflow.Labels[workflowValidLabel] = isValid
+		wf.Labels[workflowValidLabel] = isValid
 
 		stillInvalid := wasValid == falseString && isValid == falseString
 		if stillInvalid {
 			// Workflow is still invalid, no state to update
 			// return as we do not want to process an invalid workflow
-			return false
+			return nil, fmt.Errorf("workflow %v is invalid", wf.Name)
 		}
 
 		turnedInvalid := isValid == falseString
 		if turnedInvalid {
 			// Workflow is validated for the first time and
 			// is invalid, update status on the server
-			return true
+			return wf, nil
 		}
-
-		// Workflow is valid, continue processing
-		needsStatusUpdate = true
 	}
 
 	// Check if workflow has completed
 	workflowComplete := true
-	for stepName, step := range workflow.Spec.Steps {
-		if stepStatus, ok := workflow.Status.Statuses[stepName]; ok && stepStatus.Complete {
+	for stepName, step := range wf.Spec.Steps {
+		if stepStatus, ok := wf.Status.Statuses[stepName]; ok && stepStatus.Complete {
 			continue // step completed nothing to do
 		}
 		workflowComplete = false
 		switch {
 		case step.JobTemplate != nil: // Job step
-			needsStatusUpdate = t.processJobStep(workflow, stepName, &step) || needsStatusUpdate
+			t.processJobStep(&workflow, stepName, &step) // TODO: fix this
+			if err != nil {
+				return nil, err
+			}
 		case step.ExternalRef != nil: // external object reference
-			needsStatusUpdate = t.processExternalReferenceStep(workflow, stepName, &step) || needsStatusUpdate
+			t.processExternalReferenceStep(&workflow, stepName, &step)
 		}
 	}
 
 	if workflowComplete {
-		glog.V(3).Infof("Setting workflow complete status for workflow %v", workflow.Name)
+		glog.V(3).Infof("Setting workflow complete status for workflow %v", wf.Name)
 		now := k8sApiUnv.Now()
 		condition := api.WorkflowCondition{
 			Type:               api.WorkflowComplete,
@@ -238,22 +166,21 @@ func (t *Transitioner) process(workflow *api.Workflow) bool {
 			LastProbeTime:      now,
 			LastTransitionTime: now,
 		}
-		workflow.Status.Conditions = append(workflow.Status.Conditions, condition)
-		workflow.Status.CompletionTime = &now
-		needsStatusUpdate = true
+		wf.Status.Conditions = append(wf.Status.Conditions, condition)
+		wf.Status.CompletionTime = &now
 	}
 
-	return needsStatusUpdate
+	return wf, nil
 }
 
-// processJobStep processes a job that holds a reference to a job.
-// This method will create a new job or update a running job's status, given that
-// its dependencies are satisfied.
-func (t *Transitioner) processJobStep(workflow *api.Workflow, stepName string, step *api.WorkflowStep) bool {
+// processJobStep processes a step that holds a reference to a job.
+// The given workflow object is updated and returned
+func (t *Transitioner) processJobStep(wf *api.Workflow, stepName string, step *api.WorkflowStep) error {
 	for _, dependencyName := range step.Dependencies {
-		dependencyStatus, ok := workflow.Status.Statuses[dependencyName]
+		dependencyStatus, ok := wf.Status.Statuses[dependencyName]
 		if !ok || !dependencyStatus.Complete {
-			return false
+			// Not all dependencies are satisfied
+			return
 		}
 	}
 
@@ -261,47 +188,56 @@ func (t *Transitioner) processJobStep(workflow *api.Workflow, stepName string, s
 	glog.V(3).Infof("Dependencies satisfied for %v", stepName)
 
 	// fetch job by labelSelector and step
-	jobSelector := job.CreateWorkflowJobLabelSelector(workflow, workflow.Spec.Steps[stepName].JobTemplate, stepName)
+	jobSelector := job.CreateWorkflowJobLabelSelector(workflow, wf.Spec.Steps[stepName].JobTemplate, stepName)
 	glog.V(3).Infof("Selecting jobs using selector %v", jobSelector)
-	jobList, err := t.jobStore.Jobs(workflow.Namespace).List(jobSelector)
+	jobList, err := t.jobStore.Jobs(wf.Namespace).List(jobSelector)
 	if err != nil {
-		panic("Listing jobs on jobStore returned an error. This should not be possible.")
+		//panic("Listing jobs on jobStore returned an error. This should not be possible.")
+		return fmt.Errorf("error listing jobs: %v", err)
 	}
 
-	glog.V(3).Infof("Listing jobs for step %v of wf %v resulted in %d items", stepName, workflow.Name, len(jobList.Items))
+	glog.V(3).Infof("Listing jobs for step %v of wf %v resulted in %d items", stepName, wf.Name, len(jobList.Items))
 
 	switch len(jobList.Items) {
-	case 0: // create job
-		err := t.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
-		if err != nil {
-			glog.Errorf("Couldn't create job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
-			defer k8sUtRunt.HandleError(err)
-		} else {
-			glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
+	case 0: // Add condition running to step
+		condition := api.WorkflowStepCondition{
+			Type:               api.WorkflowStepRunning,
+			Status:             k8sApi.ConditionTrue,
+			LastProbeTime:      now,
+			LastTransitionTime: now,
 		}
-	case 1: // update status
+		append(wf.Status.Statuses[stepName].Conditions, condition)
+		glog.V(3).Infof("Updated workflowstep status to running %v in step %v for wf %v",
+			step.JobTemplate.Name, stepName, wf.Name)
+	case 1: // update workflowstep conditions
 		curJob := jobList.Items[0]
 		reference, err := k8sApi.GetReference(&curJob)
 		if err != nil || reference == nil {
-			glog.Errorf("Unable to get reference from job %v in step %v of wf %v: %v", curJob.Name, stepName, workflow.Name, err)
-			return false
+			glog.Errorf("Unable to get reference from job %v in step %v of wf %v: %v", curJob.Name, stepName, wf.Name, err)
+			return
 		}
-		oldStatus, exists := workflow.Status.Statuses[stepName]
+
+		oldStatus, exists := wf.Status.Statuses[stepName]
 		jobFinished := job.IsJobFinished(&curJob)
 		if exists && jobFinished == oldStatus.Complete {
-			return false
+			return
 		}
-		workflow.Status.Statuses[stepName] = api.WorkflowStepStatus{
-			Complete:  jobFinished,
-			Reference: *reference,
+
+		condition := api.WorkflowStepCondition{
+			Type:               api.WorkflowStepFinished,
+			Status:             k8sApi.ConditionTrue,
+			LastProbeTime:      now,
+			LastTransitionTime: now,
 		}
+
+		append(wf.Status.Statuses[stepName].Conditions, condition)
+
 		glog.V(3).Infof("Updated job status from %v to %v for job %v in step %v for wf %v", oldStatus.Complete,
-			workflow.Status.Statuses[stepName].Complete, curJob.Name, stepName, workflow.Name)
+			wf.Status.Statuses[stepName].Complete, curJob.Name, stepName, wf.Name)
 	default: // reconciliate
-		glog.Errorf("WorkflowController.manageWorkfloJob resulted in too many jobs for wf %v. Need reconciliation.", workflow.Name)
-		return false
+		glog.Errorf("WorkflowController.manageWorkfloJob resulted in too many jobs for wf %v. Need reconciliation.", wf.Name)
+		return
 	}
-	return true
 }
 
 // processReference processes as sub dag.

@@ -130,10 +130,38 @@ type WorkflowStatus struct {
 	Statuses map[string]WorkflowStepStatus `json:"statuses"`
 }
 
+// WorkflowStepConditionType is a type for conditions describing a WorkflowStep
+type WorkflowStepConditionType string
+
+const (
+	// WorkflowStepRunning means the WorkflowStep is currently running
+	WorkflowStepRunning WorkflowStepConditionType = "Running"
+	// WorkflowStepComplete means the WorkflowStep has completed
+	WorkflowStepComplete WorkflowStepConditionType = "Complete"
+	// WorkflowStepFailed means the WorkflowStep has failed
+	WorkflowStepFailed WorkflowStepConditionType = "Failed"
+)
+
+// WorkflowCondition describes a condition on a workflow
+type WorkflowCondition struct {
+	// Type of workflowstep condition
+	Type WorkflowConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status k8sApi.ConditionStatus `json:"status"`
+	// Last time the condition was checked.
+	LastProbeTime k8sApiUnv.Time `json:"lastProbeTime,omitempty"`
+	// Last time the condition transited from one status to another.
+	LastTransitionTime k8sApiUnv.Time `json:"lastTransitionTime,omitempty"`
+	// (brief) reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// Human readable message indicating details about last transition.
+	Message string `json:"message,omitempty"`
+}
+
 // WorkflowStepStatus represents the status of a single Workflow step
 type WorkflowStepStatus struct {
 	// Complete reports the completion of status
-	Complete bool `json:"complete"`
+	Conditions []WorkflowStepConditionType `json:"stepStatus"`
 	// Reference contains a reference to the WorkflowStep
 	Reference k8sApi.ObjectReference `json:"reference"`
 }
