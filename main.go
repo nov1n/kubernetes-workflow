@@ -17,6 +17,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"path"
+	"time"
 
 	"net"
 
@@ -34,14 +37,8 @@ import (
 )
 
 const (
-	WorkflowKind        = "Workflow"
-	WorkflowResource    = "workflow"
-	WorkflowAPIGroup    = "nerdalize.com"
-	WorkflowAPIVersion  = "v1alpha1"
-	WorkflowAPIVersions = []k8sApiExtensions.APIVersion{
-		"v1alpha1",
-	}
-	WorkflowDescription = "An API endpoint for workflows"
+	thirdPartyResourceRetryOnFail = 5
+	thirdPartyResourceRetryPeriod = 5 * time.Second
 )
 
 func main() {
@@ -79,7 +76,11 @@ func main() {
 		glog.Fatalf("Couldn not create batch client: %v", err)
 	}
 
-	glog.V(3).Infof("Clients initialized")
+	glog.V(3).Infof("Clients initialized.")
+
+	registerThirdPartyResource(client)
+
+	glog.V(3).Infof("ThirdPartyResource registered.")
 
 	manager := workflow.NewManager(oldClient, client, thirdPartyClient)
 	stopChan := make(chan struct{})
@@ -87,11 +88,11 @@ func main() {
 	<-stopChan
 }
 
-func registerThirdPartyResource(client k8sClient.Interface) error {
+func registerThirdPartyResource(client clientset.Interface) error {
 	opts := k8sApi.ListOptions{
 		TypeMeta: k8sApiUnversioned.TypeMeta{
-			Kind:       WorkflowKind,
-			APIVersion: WorkflowAPIGroup + "/" + WorkflowAPIVersion,
+			Kind:       api.Kind,
+			APIVersion: path.Join(api.Group, api.Version),
 		},
 	}
 	list, err := client.Extensions().ThirdPartyResources().List(opts)
@@ -101,23 +102,29 @@ func registerThirdPartyResource(client k8sClient.Interface) error {
 
 	switch len(list.Items) {
 	case 1:
+		glog.V(3).Infof("Third party resource already exists.")
 		return nil
 	case 0:
 		config := &k8sApiExtensions.ThirdPartyResource{
 			ObjectMeta: k8sApi.ObjectMeta{
-				Name: WorkflowResource + "." + WorkflowAPIGroup,
+				Name: api.Resource + "." + api.Group,
 			},
-			Description: WorkflowDescription,
-			Versions:    WorkflowAPIVersions,
+			Description: api.Description,
+			Versions:    api.Versions,
 		}
 
-		_, err := client.Extensions().ThirdPartyResources().Create(config)
-		if err != nil {
-			return fmt.Errorf("couldn't create third party resource: %v", err)
+		var createErr error
+		for i := 0; i < thirdPartyResourceRetryOnFail; i++ {
+			glog.V(3).Infof("Creating third party resource.")
+			_, createErr = client.Extensions().ThirdPartyResources().Create(config)
+			if createErr == nil {
+				return nil
+			}
+			glog.Errorf("Error while trying to create third party resource on try %v/%v: %v", i, thirdPartyResourceRetryOnFail, createErr)
+			time.Sleep(thirdPartyResourceRetryPeriod)
 		}
+		return fmt.Errorf("couldn't create third party resource: %v", createErr)
 	default:
 		return fmt.Errorf("found too many items when listing third party resources: %d items found", len(list.Items))
 	}
-
-	return nil
 }
