@@ -113,7 +113,7 @@ type WorkflowCondition struct {
 // WorkflowStatus represents the current state/status of the Workflow
 type WorkflowStatus struct {
 	// Conditions represent the latest available observations of an object's current state.
-	Conditions []WorkflowCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+	Conditions map[WorkflowConditionType]WorkflowCondition `json:"conditions"`
 
 	// StartTime represents time when the workflow was acknowledged by the Workflow controller
 	// It is not guaranteed to be set in happens-before order across separate operations.
@@ -143,9 +143,9 @@ const (
 )
 
 // WorkflowCondition describes a condition on a workflow
-type WorkflowCondition struct {
+type WorkflowStepCondition struct {
 	// Type of workflowstep condition
-	Type WorkflowConditionType `json:"type"`
+	Type WorkflowStepConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status k8sApi.ConditionStatus `json:"status"`
 	// Last time the condition was checked.
@@ -161,7 +161,7 @@ type WorkflowCondition struct {
 // WorkflowStepStatus represents the status of a single Workflow step
 type WorkflowStepStatus struct {
 	// Complete reports the completion of status
-	Conditions []WorkflowStepConditionType `json:"stepStatus"`
+	Conditions map[WorkflowStepConditionType]WorkflowStepCondition `json:"conditions"`
 	// Reference contains a reference to the WorkflowStep
 	Reference k8sApi.ObjectReference `json:"reference"`
 }
@@ -206,7 +206,7 @@ func (wf *Workflow) SetUID() {
 	wf.Spec.JobsSelector.MatchLabels[WorkflowUIDLabel] = string(wf.UID)
 }
 
-// IsWorkflowFinished returns whether a workflow is finished.
+// IsFinished returns whether a workflow is finished.
 func (wf *Workflow) IsFinished() bool {
 	for _, c := range wf.Status.Conditions {
 		conditionWFFinished := (c.Type == WorkflowComplete || c.Type == WorkflowFailed)

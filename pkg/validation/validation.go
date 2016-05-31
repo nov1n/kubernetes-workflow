@@ -149,9 +149,9 @@ func getWorkflowRunningAndCompletedSteps(workflow *api.Workflow) (running, compl
 	}
 	for key := range workflow.Spec.Steps {
 		if step, found := workflow.Status.Statuses[key]; found {
-			if step.Complete {
+			if step.Conditions[api.WorkflowStepComplete].Status == k8sApi.ConditionTrue {
 				completed[key] = true
-			} else {
+			} else if step.Conditions[api.WorkflowStepRunning].Status == k8sApi.ConditionTrue {
 				running[key] = true
 			}
 		}
