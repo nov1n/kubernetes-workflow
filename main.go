@@ -18,7 +18,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"path"
 	"time"
 
 	"net"
@@ -29,6 +28,7 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/workflow"
 
 	k8sApi "k8s.io/kubernetes/pkg/api"
+	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sApiExtensions "k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -89,25 +89,18 @@ func main() {
 }
 
 func registerThirdPartyResource(client clientset.Interface) error {
-	opts := k8sApi.ListOptions{
-		TypeMeta: k8sApiUnversioned.TypeMeta{
-			Kind:       api.Kind,
-			APIVersion: path.Join(api.Group, api.Version),
-		},
-	}
-	list, err := client.Extensions().ThirdPartyResources().List(opts)
-	if err != nil {
-		return fmt.Errorf("couldn't do initial list of third party resources: %v", err)
+	name := api.Resource + "." + api.Group
+	_, err := client.Extensions().ThirdPartyResources().Get(name)
+	if err == nil {
+		return nil
 	}
 
-	switch len(list.Items) {
-	case 1:
-		glog.V(3).Infof("Third party resource already exists.")
-		return nil
-	case 0:
+	// if we got a status error indicating the resource was not found
+	// a.k.a. the tpr was not registered yet.
+	if serr, ok := err.(*k8sApiErr.StatusError); ok && serr.Status().Reason == k8sApiUnversioned.StatusReasonNotFound {
 		config := &k8sApiExtensions.ThirdPartyResource{
 			ObjectMeta: k8sApi.ObjectMeta{
-				Name: api.Resource + "." + api.Group,
+				Name: name,
 			},
 			Description: api.Description,
 			Versions:    api.Versions,
@@ -124,7 +117,7 @@ func registerThirdPartyResource(client clientset.Interface) error {
 			time.Sleep(thirdPartyResourceRetryPeriod)
 		}
 		return fmt.Errorf("couldn't create third party resource: %v", createErr)
-	default:
-		return fmt.Errorf("found too many items when listing third party resources: %d items found", len(list.Items))
+
 	}
+	return fmt.Errorf("couldn't do initial list of third party resources: %v", err)
 }
