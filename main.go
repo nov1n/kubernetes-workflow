@@ -17,6 +17,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"time"
 
 	"net"
 
@@ -25,10 +27,18 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/workflow"
 
+	k8sApi "k8s.io/kubernetes/pkg/api"
+	k8sApiErr "k8s.io/kubernetes/pkg/api/errors"
 	k8sApiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	k8sApiExtensions "k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	k8sRestCl "k8s.io/kubernetes/pkg/client/restclient"
 	k8sClient "k8s.io/kubernetes/pkg/client/unversioned"
+)
+
+const (
+	thirdPartyResourceRetryOnFail = 5
+	thirdPartyResourceRetryPeriod = 5 * time.Second
 )
 
 func main() {
@@ -66,10 +76,48 @@ func main() {
 		glog.Fatalf("Couldn not create batch client: %v", err)
 	}
 
-	glog.V(3).Infof("Clients initialized")
+	glog.V(3).Infof("Clients initialized.")
+
+	registerThirdPartyResource(client)
+
+	glog.V(3).Infof("ThirdPartyResource registered.")
 
 	manager := workflow.NewManager(oldClient, client, thirdPartyClient)
 	stopChan := make(chan struct{})
 	manager.Run(5, stopChan)
 	<-stopChan
+}
+
+func registerThirdPartyResource(client clientset.Interface) error {
+	name := api.Resource + "." + api.Group
+	_, err := client.Extensions().ThirdPartyResources().Get(name)
+	if err == nil {
+		return nil
+	}
+
+	// if we got a status error indicating the resource was not found
+	// a.k.a. the tpr was not registered yet.
+	if serr, ok := err.(*k8sApiErr.StatusError); ok && serr.Status().Reason == k8sApiUnversioned.StatusReasonNotFound {
+		config := &k8sApiExtensions.ThirdPartyResource{
+			ObjectMeta: k8sApi.ObjectMeta{
+				Name: name,
+			},
+			Description: api.Description,
+			Versions:    api.Versions,
+		}
+
+		var createErr error
+		for i := 0; i < thirdPartyResourceRetryOnFail; i++ {
+			glog.V(3).Infof("Creating third party resource.")
+			_, createErr = client.Extensions().ThirdPartyResources().Create(config)
+			if createErr == nil {
+				return nil
+			}
+			glog.Errorf("Error while trying to create third party resource on try %v/%v: %v", i, thirdPartyResourceRetryOnFail, createErr)
+			time.Sleep(thirdPartyResourceRetryPeriod)
+		}
+		return fmt.Errorf("couldn't create third party resource: %v", createErr)
+
+	}
+	return fmt.Errorf("couldn't do initial list of third party resources: %v", err)
 }
