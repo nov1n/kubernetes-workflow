@@ -27,9 +27,11 @@
                   {
                     "name": "ubuntu1",
                     "image": "jess/stress",
-                    "command": [
+                    "args": [
                       "-c",
-                      "1"
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]
@@ -61,9 +63,11 @@
                   {
                     "name": "ubuntu2",
                     "image": "jess/stress",
-                    "command": [
+                    "args": [
                       "-c",
-                      "1"
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]
@@ -95,9 +99,11 @@
                   {
                     "name": "ubuntu3",
                     "image": "jess/stress",
-                    "command": [
+                    "args": [
                       "-c",
-                      "1"
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]
@@ -129,9 +135,11 @@
                   {
                     "name": "ubuntu4",
                     "image": "jess/stress",
-                    "command": [
+                    "args": [
                       "-c",
-                      "1"
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]
@@ -164,9 +172,11 @@
                   {
                     "name": "ubuntu5",
                     "image": "jess/stress",
-                    "command": [
+                    "args": [
                       "-c",
-                      "1"
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]
@@ -198,9 +208,11 @@
                   {
                     "name": "ubuntu6",
                     "image": "jess/stress",
-                    "command": [
+                    "args": [
                       "-c",
-                      "1"
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]

@@ -22,9 +22,11 @@ spec:
                 -
                   name: "ubuntu1"
                   image: "jess/stress"
-                  command:
+                  args:
                     - "-c"
                     - "1"
+                    - -t
+                    - "20"
     step-b:
       dependencies:
         - "step-a"
@@ -44,9 +46,11 @@ spec:
                 -
                   name: "ubuntu2"
                   image: "jess/stress"
-                  command:
+                  args:
                     - "-c"
                     - "1"
+                    - -t
+                    - "20"
     step-c:
       dependencies:
         - "step-b"
@@ -66,9 +70,11 @@ spec:
                 -
                   name: "ubuntu3"
                   image: "jess/stress"
-                  command:
+                  args:
                     - "-c"
                     - "1"
+                    - -t
+                    - "20"
     step-d:
       dependencies:
         - "step-b"
@@ -88,9 +94,11 @@ spec:
                 -
                   name: "ubuntu4"
                   image: "jess/stress"
-                  command:
+                  args:
                     - "-c"
                     - "1"
+                    - -t
+                    - "20"
     step-e:
       dependencies:
         - "step-c"
@@ -111,9 +119,11 @@ spec:
                 -
                   name: "ubuntu5"
                   image: "jess/stress"
-                  command:
+                  args:
                     - "-c"
                     - "1"
+                    - -t
+                    - "20"
     step-f:
       dependencies:
         - "step-e"
@@ -133,6 +143,8 @@ spec:
                 -
                   name: "ubuntu6"
                   image: "jess/stress"
-                  command:
+                  args:
                     - "-c"
                     - "1"
+                    - -t
+                    - "20"
