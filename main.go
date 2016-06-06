@@ -78,7 +78,11 @@ func main() {
 
 	glog.V(3).Infof("Clients initialized.")
 
-	registerThirdPartyResource(client)
+	err = registerThirdPartyResource(client)
+	if err != nil {
+		glog.Errorf("Couldn't initialize tpr, shutting down.")
+		return
+	}
 
 	glog.V(3).Infof("ThirdPartyResource registered.")
 
@@ -90,9 +94,23 @@ func main() {
 
 func registerThirdPartyResource(client clientset.Interface) error {
 	name := api.Resource + "." + api.Group
-	_, err := client.Extensions().ThirdPartyResources().Get(name)
-	if err == nil {
-		return nil
+	var err error
+
+	// Try to get the TPR from the server. In case the server is not up yet,
+	// when the proxy is not up yet, or when some other unexpected error
+	// occurs, a GET is tried again after thirdPartyResourceRetryPeriod.
+	for {
+		serr, ok := err.(*k8sApiErr.StatusError)
+		if ok && serr.Status().Reason == k8sApiUnversioned.StatusReasonNotFound {
+			break
+		}
+		_, err = client.Extensions().ThirdPartyResources().Get(name)
+		if err == nil {
+			glog.V(3).Infof("No errors when getting tpr.")
+			return nil
+		}
+		glog.Errorf("Received unknown error when trying to acces API server: %v. Retrying..", err)
+		time.Sleep(thirdPartyResourceRetryPeriod)
 	}
 
 	// if we got a status error indicating the resource was not found
