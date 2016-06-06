@@ -53,6 +53,9 @@ type Manager struct {
 	// Added as a member to the struct to allow injection for testing.
 	jobStoreSynced func() bool
 
+	// A TTLCache of job creates/deletes
+	expectations *k8sCtl.ControllerExpectations
+
 	// A store of workflow, populated by the frameworkController
 	workflowStore cache.StoreToWorkflowLister
 	// Watches changes to all workflows
@@ -80,6 +83,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 		kubeClient:    kubeClient,
 		tpClient:      tpClient,
 		queue:         k8sWq.New(),
+		expectations:  k8sCtl.NewControllerExpectations(),
 	}
 
 	// Create a new Informer to sync the upstream workflow store with
@@ -207,7 +211,13 @@ func (m *Manager) addJob(obj interface{}) {
 	job := obj.(*k8sBatch.Job)
 	glog.V(3).Infof("addJob %v", job.Name)
 	if workflow := m.getJobWorkflow(job); workflow != nil {
+		key, err := k8sCtl.KeyFunc(workflow)
+		if err != nil {
+			glog.Errorf("Couldn't get key for workflow %#v: %v", workflow, err)
+			return
+		}
 		glog.V(3).Infof("enqueueing controller for %v", job.Name)
+		m.expectations.CreationObserved(key)
 		m.enqueueWorkflow(workflow)
 	}
 }
