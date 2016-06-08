@@ -21,11 +21,13 @@ import (
 
 const (
 	workflowValidLabel             = "valid"
+	workflowPauseLabel             = "pause"
 	recorderComponent              = "workflow-controller"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
 	retryOnStatusConflict          = 3
 	falseString                    = "false"
+	trueString                     = "true"
 )
 
 // Transitioner is responsible for transitioning a workflow from its current
@@ -152,6 +154,11 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 
 	// If the workflow is finished we don't have to do anything
 	if workflow.IsFinished() {
+		return false, 0, nil
+	}
+
+	// If a workflow is requested to be paused, don't process it.
+	if pause, ok := workflow.Labels[workflowPauseLabel]; ok && pause == trueString {
 		return false, 0, nil
 	}
 
