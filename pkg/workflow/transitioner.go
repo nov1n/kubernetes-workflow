@@ -162,6 +162,7 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	// workflow to get requeued by a job added event.
 	satisfied := t.expectations.SatisfiedExpectations(key)
 	if !satisfied {
+		// exp, _, err := t.expectations.GetExpectations(key)
 		glog.V(4).Infof("Expectations for workflow %v not yet satisfied.", key)
 		return false, 0, nil
 	}
@@ -197,7 +198,7 @@ func (t *Transitioner) process(workflow *api.Workflow) bool {
 	// Set defaults for workflow
 	if _, ok := workflow.Labels[api.WorkflowUIDLabel]; !ok {
 		workflow.SetUID()
-		needsStatusUpdate = true
+		return true
 	}
 
 	// Create empty status map
