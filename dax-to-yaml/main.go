@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	k8sApi "k8s.io/kubernetes/pkg/api"
@@ -54,6 +55,7 @@ func newWorkflow(name string) *api.Workflow {
 }
 
 func newStep(name string, dependencies []string) api.WorkflowStep {
+	name = strings.ToLower(name)
 	return api.WorkflowStep{
 		Dependencies: dependencies,
 		JobTemplate: &k8sBatch.JobTemplateSpec{
@@ -120,14 +122,14 @@ func main() {
 	for _, child := range adag.Childs {
 		var dependencies []string
 		for _, dep := range child.Parents {
-			dependencies = append(dependencies, dep.Ref)
+			dependencies = append(dependencies, strings.ToLower(dep.Ref))
 		}
 		adag.ChildMap[child.Ref] = dependencies
 	}
 
 	wf := newWorkflow(name)
 	for _, job := range adag.Jobs {
-		wf.Spec.Steps[job.ID] = newStep(job.ID, adag.ChildMap[job.ID])
+		wf.Spec.Steps[strings.ToLower(job.ID)] = newStep(job.ID, adag.ChildMap[job.ID])
 	}
 
 	b, err := json.Marshal(wf)
