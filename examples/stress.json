@@ -25,10 +25,12 @@
                 "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu",
                     "name": "ubuntu1",
-                    "command": [
-                      "/bin/sleep",
+                    "image": "jess/stress",
+                    "args": [
+                      "-c",
+                      "1",
+                      "-t",
                       "20"
                     ]
                   }
@@ -59,10 +61,12 @@
                 "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu",
                     "name": "ubuntu2",
-                    "command": [
-                      "/bin/sleep",
+                    "image": "jess/stress",
+                    "args": [
+                      "-c",
+                      "1",
+                      "-t",
                       "20"
                     ]
                   }
@@ -93,10 +97,12 @@
                 "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu",
                     "name": "ubuntu3",
-                    "command": [
-                      "/bin/sleep",
+                    "image": "jess/stress",
+                    "args": [
+                      "-c",
+                      "1",
+                      "-t",
                       "20"
                     ]
                   }
@@ -127,11 +133,13 @@
                 "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu",
                     "name": "ubuntu4",
-                    "command": [
-                      "/bin/sleep",
-                      "40"
+                    "image": "jess/stress",
+                    "args": [
+                      "-c",
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]
@@ -162,10 +170,12 @@
                 "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu",
                     "name": "ubuntu5",
-                    "command": [
-                      "/bin/sleep",
+                    "image": "jess/stress",
+                    "args": [
+                      "-c",
+                      "1",
+                      "-t",
                       "20"
                     ]
                   }
@@ -196,11 +206,13 @@
                 "restartPolicy": "OnFailure",
                 "containers": [
                   {
-                    "image": "ubuntu",
                     "name": "ubuntu6",
-                    "command": [
-                      "/bin/sleep",
-                      "10"
+                    "image": "jess/stress",
+                    "args": [
+                      "-c",
+                      "1",
+                      "-t",
+                      "20"
                     ]
                   }
                 ]

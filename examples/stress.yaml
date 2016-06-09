@@ -20,10 +20,12 @@ spec:
               restartPolicy: "OnFailure"
               containers:
                 -
-                  image: "ubuntu"
                   name: "ubuntu1"
-                  command:
-                    - "/bin/sleep"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
                     - "20"
     step-b:
       dependencies:
@@ -42,10 +44,12 @@ spec:
               restartPolicy: "OnFailure"
               containers:
                 -
-                  image: "ubuntu"
                   name: "ubuntu2"
-                  command:
-                    - "/bin/sleep"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
                     - "20"
     step-c:
       dependencies:
@@ -64,10 +68,12 @@ spec:
               restartPolicy: "OnFailure"
               containers:
                 -
-                  image: "ubuntu"
                   name: "ubuntu3"
-                  command:
-                    - "/bin/sleep"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
                     - "20"
     step-d:
       dependencies:
@@ -86,11 +92,13 @@ spec:
               restartPolicy: "OnFailure"
               containers:
                 -
-                  image: "ubuntu"
                   name: "ubuntu4"
-                  command:
-                    - "/bin/sleep"
-                    - "40"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"
     step-e:
       dependencies:
         - "step-c"
@@ -109,10 +117,12 @@ spec:
               restartPolicy: "OnFailure"
               containers:
                 -
-                  image: "ubuntu"
                   name: "ubuntu5"
-                  command:
-                    - "/bin/sleep"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
                     - "20"
     step-f:
       dependencies:
@@ -131,8 +141,10 @@ spec:
               restartPolicy: "OnFailure"
               containers:
                 -
-                  image: "ubuntu"
                   name: "ubuntu6"
-                  command:
-                    - "/bin/sleep"
-                    - "10"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"
