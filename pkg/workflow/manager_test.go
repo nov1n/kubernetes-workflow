@@ -632,6 +632,7 @@ func TestWatchJobs(t *testing.T) {
 }
 
 func TestExpectations(t *testing.T) {
+	flag.Lookup("v").Value.Set(fmt.Sprint(*myV))
 	clientConfig := &k8sRestCl.Config{Host: "", ContentConfig: k8sRestCl.ContentConfig{GroupVersion: k8sTestApi.Default.GroupVersion()}}
 	clientset := k8sClSet.NewForConfigOrDie(clientConfig)
 	oldClient := k8sCl.NewOrDie(clientConfig)
@@ -665,16 +666,31 @@ func TestExpectations(t *testing.T) {
 			},
 		},
 	}
+
+	// First test: try to call transition twice and see if only 1 job was created.
 	expectedStartedJob := 1
 	noOfTransitionsCalls := 2
 	// setup workflow
 	manager.workflowStore.Store.Add(workflow)
-	for i := 0; i < noOfTransitionsCalls-1; i++ {
+	for i := 0; i < noOfTransitionsCalls; i++ {
 		_, _, err := manager.transitioner.transition(getKey(workflow, t))
 		if err != nil {
 			t.Errorf("unexpected error syncing workflow %v", err)
 			return
 		}
+	}
+	if len(fakeJobControl.CreatedJobTemplates) != expectedStartedJob {
+		t.Errorf("unexpected # of created jobs: expected %d got %d", expectedStartedJob, len(fakeJobControl.CreatedJobTemplates))
+	}
+
+	// Second test: pretend the creation was observed, expected creations in total
+	// should now be 2.
+	expectedStartedJob = 2
+	manager.expectations.CreationObserved("default/mydag", "myJob")
+	_, _, err := manager.transitioner.transition(getKey(workflow, t))
+	if err != nil {
+		t.Errorf("unexpected error syncing workflow %v", err)
+		return
 	}
 	if len(fakeJobControl.CreatedJobTemplates) != expectedStartedJob {
 		t.Errorf("unexpected # of created jobs: expected %d got %d", expectedStartedJob, len(fakeJobControl.CreatedJobTemplates))
