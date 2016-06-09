@@ -287,16 +287,14 @@ func (t *Transitioner) processJobStep(workflow *api.Workflow, stepName string, s
 	switch len(jobList.Items) {
 	case 0: // create job
 		err := t.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
-		key, _ := k8sCtl.KeyFunc(workflow)
-		t.expectations.ExpectCreations(key, 1)
 		if err != nil {
 			glog.Errorf("Couldn't create job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
-			//  Decrement the expected number of creates because the informer won't observe this job.
-			t.expectations.CreationObserved(key)
-			defer k8sUtRunt.HandleError(err)
-		} else {
-			glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
+			k8sUtRunt.HandleError(err)
+			return false
 		}
+		key, _ := k8sCtl.KeyFunc(workflow)
+		t.expectations.ExpectCreations(key, 1)
+		glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
 	case 1: // update status
 		curJob := jobList.Items[0]
 		reference, err := k8sApi.GetReference(&curJob)
