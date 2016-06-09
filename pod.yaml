@@ -6,7 +6,7 @@ spec:
   restartPolicy: Always
   containers:
   - name: flower
-    image: gcr.io/bep-matosi/flower:1.0.3
+    image: gcr.io/bep-matosi/flower:1.0.6
     args:
     - -v=3
   - name: kubectl

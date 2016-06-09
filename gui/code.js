@@ -1,4 +1,4 @@
-var baseURL = "http://localhost:8080/apis";
+var baseURL = "http://localhost:1337/localhost:8080/apis";
 var APIGroup = "nerdalize.com";
 var APIVersion = "v1alpha1";
 
