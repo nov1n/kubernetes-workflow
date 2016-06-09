@@ -161,8 +161,8 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	// See if all expectations are satisfied yet. If not, exit and wait for the
 	// workflow to get requeued by a job added event.
 	satisfied := t.expectations.SatisfiedExpectations(key)
-	exp, _, err := t.expectations.GetExpectations(key)
-	if err == nil {
+	exp, exists, err := t.expectations.GetExpectations(key)
+	if exists {
 		adds, _ := exp.GetExpectations()
 		glog.V(3).Infof("Workflow %v has %v add expectations.", key, adds)
 	}
