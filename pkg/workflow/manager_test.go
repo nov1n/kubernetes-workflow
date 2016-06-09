@@ -607,6 +607,56 @@ func TestWatchJobs(t *testing.T) {
 	<-received
 }
 
+func TestExpectations(t *testing.T) {
+	clientConfig := &k8sRestCl.Config{Host: "", ContentConfig: k8sRestCl.ContentConfig{GroupVersion: k8sTestApi.Default.GroupVersion()}}
+	clientset := k8sClSet.NewForConfigOrDie(clientConfig)
+	oldClient := k8sCl.NewOrDie(clientConfig)
+	thirdPartyClient := client.NewThirdPartyOrDie(k8sApiUnv.GroupVersion{
+		Group:   api.Group,
+		Version: api.Version,
+	}, *clientConfig)
+
+	manager := NewManager(oldClient, clientset, thirdPartyClient)
+	fakeJobControl := job.FakeControl{}
+	manager.transitioner.jobControl = &fakeJobControl
+	manager.transitioner.jobStoreSynced = func() bool { return true }
+	manager.transitioner.updateHandler = func(workflow *api.Workflow) error {
+		return nil
+	}
+
+	workflow := &api.Workflow{
+		ObjectMeta: k8sApi.ObjectMeta{
+			Name:      "mydag",
+			Namespace: k8sApi.NamespaceDefault,
+			Labels:    map[string]string{api.WorkflowUIDLabel: "123"},
+		},
+		Spec: api.WorkflowSpec{
+			JobsSelector: &k8sApiUnv.LabelSelector{
+				MatchLabels: map[string]string{api.WorkflowUIDLabel: "123"},
+			},
+			Steps: map[string]api.WorkflowStep{
+				"myJob": {
+					JobTemplate: newJobTemplateSpec(),
+				},
+			},
+		},
+	}
+	expectedStartedJob := 1
+	noOfTransitionsCalls := 2
+	// setup workflow
+	manager.workflowStore.Store.Add(workflow)
+	for i := 0; i < noOfTransitionsCalls-1; i++ {
+		_, _, err := manager.transitioner.transition(getKey(workflow, t))
+		if err != nil {
+			t.Errorf("unexpected error syncing workflow %v", err)
+			return
+		}
+	}
+	if len(fakeJobControl.CreatedJobTemplates) != expectedStartedJob {
+		t.Errorf("unexpected # of created jobs: expected %d got %d", expectedStartedJob, len(fakeJobControl.CreatedJobTemplates))
+	}
+}
+
 // TestWatchJobs the case when jobs are added and we get watch events from the server.
 // func TestWatchUpdateJobs(t *testing.T) {
 // 	testWorkflow := newTestWorkflow()

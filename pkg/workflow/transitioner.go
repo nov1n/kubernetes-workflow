@@ -16,6 +16,7 @@ import (
 	k8sApiUnv "k8s.io/kubernetes/pkg/api/unversioned"
 	k8sClSetUnv "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	k8sRec "k8s.io/kubernetes/pkg/client/record"
+	k8sCtl "k8s.io/kubernetes/pkg/controller"
 	k8sUtRunt "k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -43,6 +44,9 @@ type Transitioner struct {
 	// jobStoreSynced returns true if the jod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	jobStoreSynced func() bool
+
+	// A TTLCache of job creates/deletes
+	expectations *k8sCtl.ControllerExpectations
 
 	// A store of workflow, populated by the frameworkController
 	workflowStore *cache.StoreToWorkflowLister
@@ -72,6 +76,7 @@ func NewTransitionerFor(m *Manager) *Transitioner {
 		jobStoreSynced: m.jobStoreSynced,
 		workflowStore:  &m.workflowStore,
 		jobStore:       &m.jobStore,
+		expectations:   m.expectations,
 		recorder:       eventBroadcaster.NewRecorder(k8sApi.EventSource{Component: recorderComponent}),
 	}
 	t.updateHandler = t.updateWorkflowStatus
@@ -140,6 +145,7 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	obj, exists, err := t.workflowStore.Store.GetByKey(key)
 	if !exists {
 		glog.V(3).Infof("Workflow has been deleted: %v", key)
+		t.expectations.DeleteExpectations(key)
 		return false, 0, nil
 	}
 	if err != nil {
@@ -149,6 +155,14 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 
 	// Copy workflow fromt the store.
 	workflow := *obj.(*api.Workflow)
+
+	// See if all expectations are satisfied yet. If not, exit and wait for the
+	// workflow to get requeued by a job added event.
+	satisfied := t.expectations.SatisfiedExpectations(key)
+	if !satisfied {
+		glog.V(4).Infof("Expectations for workflow %v not yet satisfied.", key)
+		return false, 0, nil
+	}
 
 	// If the workflow is finished we don't have to do anything
 	if workflow.IsFinished() {
@@ -275,10 +289,12 @@ func (t *Transitioner) processJobStep(workflow *api.Workflow, stepName string, s
 		err := t.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
 		if err != nil {
 			glog.Errorf("Couldn't create job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
-			defer k8sUtRunt.HandleError(err)
-		} else {
-			glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
+			k8sUtRunt.HandleError(err)
+			return false
 		}
+		key, _ := k8sCtl.KeyFunc(workflow)
+		t.expectations.ExpectCreations(key, 1)
+		glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
 	case 1: // update status
 		curJob := jobList.Items[0]
 		reference, err := k8sApi.GetReference(&curJob)
