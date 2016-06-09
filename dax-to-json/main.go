@@ -116,17 +116,17 @@ func main() {
 	scheduling := flag.Bool("scheduling", true, "Use heat scheduling.")
 	flag.Parse()
 
-	if os.Args[1] == "" {
+	if flag.NArg() == 0 {
 		fmt.Printf("Expecting file as first parameter. USAGE: dax-to-yaml [file] [wf-name].")
 		return
 	}
-	name := ""
-	if len(os.Args) == 2 {
-		name = "test-workflow"
+	name := "test-workflow"
+	if flag.NArg() == 2 {
+		name = flag.Arg(1)
 	}
 
 	// Read specified dax file.
-	file, err := os.Open(os.Args[1]) // For read access.
+	file, err := os.Open(flag.Arg(0)) // For read access.
 	if err != nil {
 		fmt.Printf("error: %v", err)
 		return
