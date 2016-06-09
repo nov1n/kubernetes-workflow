@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	workflowValidLabel             = "valid"
-	workflowPauseLabel             = "pause"
+	workflowValidLabel             = api.Group + "/valid"
+	workflowPauseLabel             = api.Group + "/pause"
 	recorderComponent              = "workflow-controller"
 	requeueAfterStatusConflictTime = 500 * time.Millisecond
 	requeueJobstoreNotSyncedTime   = 100 * time.Millisecond
