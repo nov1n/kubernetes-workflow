@@ -25,9 +25,6 @@ import (
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 )
 
-// WorkflowUIDLabel is a unique label for workflows, used as prefix.
-const WorkflowUIDLabel = "workflow-uid"
-
 // Workflow object representing a single workflow
 type Workflow struct {
 	k8sApiUnv.TypeMeta `json:",inline"`

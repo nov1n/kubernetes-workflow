@@ -35,7 +35,7 @@ import (
 
 const (
 	// WorkflowStepLabelKey defines the label assigned to a workflow
-	WorkflowStepLabelKey = "kubernetes.io/workflow"
+	WorkflowStepLabelKey = api.Group + "/workflow"
 
 	// Version of the codec
 	codecVersion = "v1"
