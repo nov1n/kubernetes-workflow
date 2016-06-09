@@ -100,15 +100,19 @@ func registerThirdPartyResource(client clientset.Interface) error {
 	// when the proxy is not up yet, or when some other unexpected error
 	// occurs, a GET is tried again after thirdPartyResourceRetryPeriod.
 	for {
-		serr, ok := err.(*k8sApiErr.StatusError)
-		if ok && serr.Status().Reason == k8sApiUnversioned.StatusReasonNotFound {
-			break
-		}
 		_, err = client.Extensions().ThirdPartyResources().Get(name)
+		// No error means API server is accessible and workflow tpr is already registered.
 		if err == nil {
 			glog.V(3).Infof("No errors when getting tpr.")
 			return nil
 		}
+		// Status error StatusReasonNotFound means the API server is accessible,
+		// but workflow tpr is not yet registered.
+		serr, ok := err.(*k8sApiErr.StatusError)
+		if ok && serr.Status().Reason == k8sApiUnversioned.StatusReasonNotFound {
+			break
+		}
+		// Probably the API server is not accessible (yet).
 		glog.Errorf("Received unknown error when trying to acces API server: %v. Retrying..", err)
 		time.Sleep(thirdPartyResourceRetryPeriod)
 	}
