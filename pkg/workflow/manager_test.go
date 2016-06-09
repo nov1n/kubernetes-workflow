@@ -40,7 +40,7 @@ func newJobTemplateSpec() *k8sBatch.JobTemplateSpec {
 			Name: "jobName",
 			Labels: map[string]string{
 				"foo":                "bar",
-				"valid":              "true",
+				workflowValidLabel:   "true",
 				api.WorkflowUIDLabel: "123",
 			},
 		},
@@ -187,7 +187,7 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Labels: map[string]string{
 							"foo":                    "bar",
 							api.WorkflowUIDLabel:     "123",
-							"valid":                  "true",
+							workflowValidLabel:       "true",
 							job.WorkflowStepLabelKey: "myJob",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
@@ -240,7 +240,7 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Labels: map[string]string{
 							"foo": "bar",
 							job.WorkflowStepLabelKey: "myJob",
-							"valid":                  "true",
+							workflowValidLabel:       "true",
 							api.WorkflowUIDLabel:     "123",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
@@ -365,7 +365,7 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Labels: map[string]string{
 							"foo": "bar",
 							job.WorkflowStepLabelKey: "one",
-							"valid":                  "true",
+							workflowValidLabel:       "true",
 							api.WorkflowUIDLabel:     "123",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
@@ -420,7 +420,7 @@ func TestControllerSyncWorkflow(t *testing.T) {
 						Labels: map[string]string{
 							"foo": "bar",
 							job.WorkflowStepLabelKey: "one",
-							"valid":                  "true",
+							workflowValidLabel:       "true",
 							api.WorkflowUIDLabel:     "123",
 						},
 						SelfLink: "/apis/v1/jobs/foo",
