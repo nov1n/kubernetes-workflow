@@ -203,7 +203,7 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	return false, 0, nil
 }
 
-// process a workflow and return whether a status updated is needed.
+// process a workflow and return whether a status update is needed.
 // This method set the defaults for a workflow, validate the workflow and
 // process its steps.
 func (t *Transitioner) process(workflow *api.Workflow) bool {
@@ -348,6 +348,8 @@ func (t *Transitioner) processJobStep(workflow *api.Workflow, stepName string, s
 	}
 	return true
 }
+
+// func (t *Transitioner) createJob()
 
 // processReference processes as sub dag.
 // TODO: Implement this.
