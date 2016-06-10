@@ -23,8 +23,9 @@ Substitute:
 * `[namespace]` for the wf's namespace.
 * `[wf-name]` for the wf's name.
 
-## Kubectl proxy
-When this GUI is used in combination with kubectl proxy, run the following proxy to deal with CORS:
+## CORS proxy
+To make the GUI work with kubectl proxy, we need another proxy to deal with CORS.
+Run the following command to start the CORS proxy.
 ```
 npm install -g corsproxy
 corsproxy
