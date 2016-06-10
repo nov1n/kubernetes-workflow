@@ -161,18 +161,25 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	// See if all expectations are satisfied yet. If not, exit and wait for the
 	// workflow to get requeued by a job added event.
 	satisfied := t.expectations.SatisfiedExpectations(key)
+	exp, exists, err := t.expectations.GetExpectations(key)
+	if exists {
+		adds, _ := exp.GetExpectations()
+		glog.V(3).Infof("Workflow %v has %v add expectations.", key, adds)
+	}
 	if !satisfied {
-		glog.V(4).Infof("Expectations for workflow %v not yet satisfied.", key)
+		glog.V(3).Infof("Expectations for workflow %v not yet satisfied.", key)
 		return false, 0, nil
 	}
 
 	// If the workflow is finished we don't have to do anything
 	if workflow.IsFinished() {
+		glog.V(3).Infof("Workflow %v is finished, no requeueuing.", workflow.Name)
 		return false, 0, nil
 	}
 
 	// If a workflow is requested to be paused, don't process it.
 	if pause, ok := workflow.Labels[workflowPauseLabel]; ok && pause == trueString {
+		glog.V(3).Infof("Workflow %v is paused, no requeueuing.", workflow.Name)
 		return false, 0, nil
 	}
 
@@ -197,7 +204,7 @@ func (t *Transitioner) process(workflow *api.Workflow) bool {
 	// Set defaults for workflow
 	if _, ok := workflow.Labels[api.WorkflowUIDLabel]; !ok {
 		workflow.SetUID()
-		needsStatusUpdate = true
+		return true
 	}
 
 	// Create empty status map
