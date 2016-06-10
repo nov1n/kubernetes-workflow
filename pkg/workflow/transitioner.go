@@ -127,52 +127,75 @@ func (t *Transitioner) updateWorkflowStatus(workflow *api.Workflow) error {
 	}
 }
 
-// Transition transitions a workflow from its current state towards a desired state.
-// It's given a key created by k8sController.KeyFunc.
-func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfter time.Duration, err error) {
-	glog.V(3).Infoln("Syncing: " + key)
-
-	startTime := time.Now()
-	defer func() {
-		glog.V(3).Infof("Finished syncing workflow %q (%v)", key, time.Now().Sub(startTime))
-	}()
-
+func (t *Transitioner) preconditionsMet(workflow *api.Workflow) bool {
 	// Check if the jobStore is synced yet (initialized)
 	if !t.jobStoreSynced() {
-		glog.V(3).Infof("Waiting for job controller to sync, requeuing workflow %v", key)
-		return true, requeueJobstoreNotSyncedTime, nil
+		glog.V(3).Infof("Waiting for job controller to sync, requeuing workflow %v", workflow.Name)
+		return false
 	}
-
-	// Obtain the workflow object from store by key
-	obj, exists, err := t.workflowStore.Store.GetByKey(key)
-	if !exists {
-		glog.V(3).Infof("Workflow has been deleted: %v", key)
-		t.expectations.DeleteExpectations(key)
-		return false, 0, nil
-	}
-	if err != nil {
-		glog.Errorf("Unable to retrieve workflow %v from store: %v", key, err)
-		return true, 0, err
-	}
-
-	// Copy workflow fromt the store.
-	workflow := *obj.(*api.Workflow)
 
 	// If the workflow is finished we don't have to do anything
 	if workflow.IsFinished() {
 		glog.V(3).Infof("Workflow %v is finished, no requeueuing.", workflow.Name)
-		return false, 0, nil
+		return false
 	}
 
 	// If a workflow is requested to be paused, don't process it.
 	if pause, ok := workflow.Labels[workflowPauseLabel]; ok && pause == trueString {
 		glog.V(3).Infof("Workflow %v is paused, no requeueuing.", workflow.Name)
+		return false
+	}
+
+	// all precondition met
+	return true
+}
+
+func (t *Transitioner) workflowByKey(key string) (*api.Workflow, bool) {
+	// Obtain the workflow object from store by key
+	obj, exists, err := t.workflowStore.Store.GetByKey(key)
+	if !exists {
+		return nil, false
+	}
+	if err != nil {
+		glog.Errorf("Unable to retrieve workflow %v from store: %v. THIS SHOULD NOT BE POSSIBLE.", key, err)
+		return nil, false
+	}
+
+	workflow := *obj.(*api.Workflow)
+	return &workflow, true
+}
+
+// Transition transitions a workflow from its current state towards a desired state.
+// It's given a key created by k8sController.KeyFunc.
+func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfter time.Duration, err error) {
+	// Loging
+	glog.V(3).Infoln("Syncing: " + key)
+	startTime := time.Now()
+	defer func() {
+		glog.V(3).Infof("Finished syncing workflow %q (%v)", key, time.Now().Sub(startTime))
+	}()
+
+	workflow, exists := t.workflowByKey(key)
+
+	// The workflow is deleted, so delete its expectations.
+	if !exists {
+		glog.V(3).Infof("Workflow has been deleted: %v", key)
+		t.expectations.DeleteExpectations(key)
+		return false, 0, nil
+	}
+
+	// Check if this workflow can be processed.
+	if !t.preconditionsMet(workflow) {
+		// Requeue controller when precondition failed because jobStore was not synced.
+		if !t.jobStoreSynced() {
+			return true, requeueJobstoreNotSyncedTime, nil
+		}
 		return false, 0, nil
 	}
 
 	// Try to schedule suitable steps
-	if t.process(&workflow) {
-		if err := t.updateHandler(&workflow); err != nil {
+	if t.process(workflow) {
+		if err := t.updateHandler(workflow); err != nil {
 			return true, requeueAfterStatusConflictTime, fmt.Errorf("failed to update workflow %v, requeuing after %v.  Error: %v", workflow.Name, requeueAfterStatusConflictTime, err)
 		}
 	}
