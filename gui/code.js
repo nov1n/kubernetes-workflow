@@ -68,9 +68,11 @@ function updateGraph(url){
       if(data.status !== undefined && data.status.statuses !== undefined) {
         $.each(data.status.statuses, function(step, status) {
           if(status.complete === true) {
-              cy.$('#' + step).addClass('completed')
+            cy.$('#' + step).addClass('completed')
+            cy.$('edge[source="' + step + '"]').addClass('completed')
           } else {
             cy.$('#' + step).addClass('running')
+            cy.$('edge[source="' + step + '"]').addClass('running')
           }
         });
       }
