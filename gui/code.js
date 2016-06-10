@@ -70,9 +70,14 @@ $(function(){ // on dom ready
           },
 
         layout: {
-          name: 'dagre'
+          name: 'dagre',
+          fit: true,
+          rankSep: 1250,
+          edgeSep: 25
         }
       });
+      cy.center();
+      cy.fit();
       var highlightNextEle = function(){
         console.log("P");
         $.getJSON(url, function (data) {
