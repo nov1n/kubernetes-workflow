@@ -20,6 +20,7 @@ import (
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
 	"github.com/nov1n/kubernetes-workflow/pkg/client"
 	"github.com/nov1n/kubernetes-workflow/pkg/client/cache"
+	jobPkg "github.com/nov1n/kubernetes-workflow/pkg/job"
 	k8sApi "k8s.io/kubernetes/pkg/api"
 	k8sBatch "k8s.io/kubernetes/pkg/apis/batch"
 	k8sCache "k8s.io/kubernetes/pkg/client/cache"
@@ -54,7 +55,7 @@ type Manager struct {
 	jobStoreSynced func() bool
 
 	// A TTLCache of job creates/deletes
-	expectations *k8sCtl.ControllerExpectations
+	expectations *WorkflowStepExpectations
 
 	// A store of workflow, populated by the frameworkController
 	workflowStore cache.StoreToWorkflowLister
@@ -83,7 +84,7 @@ func NewManager(oldClient k8sCl.Interface, kubeClient k8sClSet.Interface, tpClie
 		kubeClient:    kubeClient,
 		tpClient:      tpClient,
 		queue:         k8sWq.New(),
-		expectations:  k8sCtl.NewControllerExpectations(),
+		expectations:  NewWorkflowStepExpectations(),
 	}
 
 	// Create a new Informer to sync the upstream workflow store with
@@ -217,7 +218,7 @@ func (m *Manager) addJob(obj interface{}) {
 			return
 		}
 		glog.V(3).Infof("enqueueing controller for %v", job.Name)
-		m.expectations.CreationObserved(key)
+		m.expectations.CreationObserved(key, job.Labels[jobPkg.WorkflowStepLabelKey])
 		m.enqueueWorkflow(workflow)
 	}
 }

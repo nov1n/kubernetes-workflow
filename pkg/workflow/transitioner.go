@@ -48,7 +48,7 @@ type Transitioner struct {
 	jobStoreSynced func() bool
 
 	// A TTLCache of job creates/deletes
-	expectations *k8sCtl.ControllerExpectations
+	expectations *WorkflowStepExpectations
 
 	// A store of workflow, populated by the frameworkController
 	workflowStore *cache.StoreToWorkflowLister
@@ -157,19 +157,6 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 
 	// Copy workflow fromt the store.
 	workflow := *obj.(*api.Workflow)
-
-	// See if all expectations are satisfied yet. If not, exit and wait for the
-	// workflow to get requeued by a job added event.
-	satisfied := t.expectations.SatisfiedExpectations(key)
-	exp, exists, err := t.expectations.GetExpectations(key)
-	if exists {
-		adds, _ := exp.GetExpectations()
-		glog.V(3).Infof("Workflow %v has %v add expectations.", key, adds)
-	}
-	if !satisfied {
-		glog.V(3).Infof("Expectations for workflow %v not yet satisfied.", key)
-		return false, 0, nil
-	}
 
 	// If the workflow is finished we don't have to do anything
 	if workflow.IsFinished() {
@@ -300,14 +287,19 @@ func (t *Transitioner) processJobStep(workflow *api.Workflow, stepName string, s
 
 	switch len(jobList.Items) {
 	case 0: // create job
+		key, _ := k8sCtl.KeyFunc(workflow)
+		// When expectations are not satisfied for this job, we should wait for it
+		// to be observed by the informer.
+		if !t.expectations.ExpectationsForStepSatisfied(key, stepName) {
+			return false
+		}
 		err := t.jobControl.CreateJob(workflow.Namespace, step.JobTemplate, workflow, stepName)
 		if err != nil {
 			glog.Errorf("Couldn't create job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
 			k8sUtRunt.HandleError(err)
 			return false
 		}
-		key, _ := k8sCtl.KeyFunc(workflow)
-		t.expectations.ExpectCreations(key, 1)
+		t.expectations.ExpectCreation(key, stepName)
 		glog.V(3).Infof("Created job %v in step %v for wf %v", step.JobTemplate.Name, stepName, workflow.Name)
 	case 1: // update status
 		curJob := jobList.Items[0]
