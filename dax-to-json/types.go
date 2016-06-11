@@ -24,7 +24,7 @@ type Child struct {
 	Parents []Parent `xml:"parent"`
 }
 
-// Parents is a dependency of a child.
+// Parent is a dependency of a child.
 type Parent struct {
 	XMLName xml.Name `xml:"parent"`
 	Ref     string   `xml:"ref,attr"`
