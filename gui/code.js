@@ -61,7 +61,7 @@ function nodesAndEdgesFromData(data) {
 
 // updateGraph highlights the running and completed steps in the graph.
 // updateGraph runs every second.
-function updateGraph(url){
+function updateGraph(url, cy){
   console.log("P");
   $.getJSON(url, function (data) {
     if(data.kind == "Workflow") {
@@ -77,7 +77,7 @@ function updateGraph(url){
         });
       }
     }
-    setTimeout(updateGraph(url), 1000);
+    setTimeout(updateGraph(url, cy), 1000);
   });
 };
 
@@ -103,11 +103,11 @@ function createGraph(url) {
         layout: {
           name: 'dagre',
           fit: true,
-          rankSep: 1250,
-          edgeSep: 25
+          // rankSep: 1250,
+          // edgeSep: 25
         }
       });
-      updateGraph(url);
+      updateGraph(url, cy);
     }
   });
 }
