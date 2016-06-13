@@ -161,6 +161,14 @@ func (wf *Workflow) setLabels(labels map[string]string) {
 	}
 }
 
+// SetDefaults initializes the workflow with default values.
+func (wf *Workflow) SetDefaults() {
+	wf.Status.Statuses = make(map[string]WorkflowStepStatus, len(wf.Spec.Steps))
+	now := k8sApiUnv.Now()
+	wf.Status.StartTime = &now
+	wf.SetUID()
+}
+
 // SetUID sets the UID for a workflow.
 func (wf *Workflow) SetUID() {
 	glog.V(3).Infof("Setting labels on wf %v", wf.Name)
@@ -175,7 +183,20 @@ func (wf *Workflow) SetUID() {
 	wf.Spec.JobsSelector.MatchLabels[WorkflowUIDLabel] = string(wf.UID)
 }
 
-// IsWorkflowFinished returns whether a workflow is finished.
+// AddCompleteCondition add the Complete condition to the workflow.
+func (wf *Workflow) AddCompleteCondition() {
+	now := k8sApiUnv.Now()
+	condition := WorkflowCondition{
+		Type:               WorkflowComplete,
+		Status:             k8sApi.ConditionTrue,
+		LastProbeTime:      now,
+		LastTransitionTime: now,
+	}
+	wf.Status.Conditions = append(wf.Status.Conditions, condition)
+	wf.Status.CompletionTime = &now
+}
+
+// IsFinished returns whether a workflow is finished.
 func (wf *Workflow) IsFinished() bool {
 	for _, c := range wf.Status.Conditions {
 		conditionWFFinished := (c.Type == WorkflowComplete || c.Type == WorkflowFailed)
@@ -186,4 +207,15 @@ func (wf *Workflow) IsFinished() bool {
 		}
 	}
 	return false
+}
+
+// DependenciesResolved returns true when all the step's dependencies are completed.
+func (s *WorkflowStep) DependenciesResolved(workflow *Workflow) bool {
+	for _, dependencyName := range s.Dependencies {
+		dependencyStatus, ok := workflow.Status.Statuses[dependencyName]
+		if !ok || !dependencyStatus.Complete {
+			return false
+		}
+	}
+	return true
 }
