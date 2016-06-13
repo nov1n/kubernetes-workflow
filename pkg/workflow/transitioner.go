@@ -168,8 +168,7 @@ func (t *Transitioner) workflowByKey(key string) (*api.Workflow, bool) {
 // Transition transitions a workflow from its current state towards a desired state.
 // It's given a key created by k8sController.KeyFunc.
 func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfter time.Duration, err error) {
-	// Loging
-	glog.V(3).Infoln("Syncing: " + key)
+	log.V(3).Infoln("Syncing: " + key)
 	startTime := time.Now()
 	defer func() {
 		glog.V(3).Infof("Finished syncing workflow %q (%v)", key, time.Now().Sub(startTime))
@@ -203,8 +202,8 @@ func (t *Transitioner) transitionWorkflow(key string) (requeue bool, requeueAfte
 	return false, 0, nil
 }
 
-// process a workflow and return whether a status update is needed.
-// This method set the defaults for a workflow, validate the workflow and
+// process processes a workflow and return whether a status update is needed.
+// This method sets the defaults for a workflow, validate the workflow and
 // process its steps.
 func (t *Transitioner) process(workflow *api.Workflow) bool {
 	glog.V(3).Infof("Manage workflow %v", workflow.Name)

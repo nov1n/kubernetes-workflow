@@ -209,8 +209,7 @@ func (wf *Workflow) IsFinished() bool {
 	return false
 }
 
-// DependenciesResolved returns true when all the step's dependencies are
-// completed or when the step has no dependencies.
+// DependenciesResolved returns true when all the step's dependencies are completed.
 func (s *WorkflowStep) DependenciesResolved(workflow *Workflow) bool {
 	for _, dependencyName := range s.Dependencies {
 		dependencyStatus, ok := workflow.Status.Statuses[dependencyName]

@@ -62,7 +62,6 @@ function nodesAndEdgesFromData(data) {
 // updateGraph highlights the running and completed steps in the graph.
 // updateGraph runs every second.
 function updateGraph(url, cy){
-  console.log("P");
   $.getJSON(url, function (data) {
     if(data.kind == "Workflow") {
       if(data.status !== undefined && data.status.statuses !== undefined) {
@@ -84,7 +83,7 @@ function updateGraph(url, cy){
 // getUrl returns the URL for the workflow endpoint.
 function getUrl() {
   var parts = window.location.hash.replace("#", '').split("/");
-  return baseURL + "/" + APIGroup + "/" + APIVersion + "/namespaces/" + parts[0] + "/workflows/" + parts[1];
+  return [baseURL, APIGroup, APIVersion, "namespaces", parts[0], "workflows", parts[1]].join("/");
 }
 
 // createGraph initializes the graph and calls the update function.
@@ -93,7 +92,6 @@ function createGraph(url) {
     if(data.kind == "Status") {
       alert("Received a status message: " + data)
     } else if (data.kind == "Workflow") {
-      console.log(data);
       var cy = cytoscape({
         container: document.getElementById('cy'),
         boxSelectionEnabled: false,
@@ -102,9 +100,7 @@ function createGraph(url) {
         elements: nodesAndEdgesFromData(data),
         layout: {
           name: 'dagre',
-          fit: true,
-          // rankSep: 1250,
-          // edgeSep: 25
+          fit: true
         }
       });
       updateGraph(url, cy);
@@ -121,6 +117,5 @@ $(function(){
   }
   // Create the graph.
   var url = getUrl();
-  console.log(url);
   createGraph(url);
 });
