@@ -15,11 +15,13 @@ import (
 var (
 	// scheduling specifies whether to use the heat scheduling annotation or not.
 	scheduling = flag.Bool("scheduling", true, "Use heat scheduling.")
+	// defaultWorkflowName is the default workflow name.
+	defaultWorkflowName = "test-workflow"
 )
 
 // getWorkflowName gets a workflow name that was specified as a cli argument.
 func getWorkflowName() string {
-	name := "test-workflow"
+	name := defaultWorkflowName
 	if flag.NArg() == 2 {
 		name = flag.Arg(1)
 	}
