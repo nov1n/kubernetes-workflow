@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/nov1n/kubernetes-workflow/pkg/api"
@@ -54,7 +55,7 @@ func newWorkflow(name string) *api.Workflow {
 // 0 and 500.
 func newStep(name string, dependencies []string, scheduling bool) api.WorkflowStep {
 	name = strings.ToLower(name)
-	millicores := rand.Intn(millicoresRange) * millicoreFactor
+	load := rand.Intn(millicoresRange)
 	step := api.WorkflowStep{
 		Dependencies: dependencies,
 		JobTemplate: &k8sBatch.JobTemplateSpec{
@@ -71,15 +72,19 @@ func newStep(name string, dependencies []string, scheduling bool) api.WorkflowSt
 						RestartPolicy: "OnFailure",
 						Containers: []k8sApi.Container{
 							{
-								Image: "jess/stress",
+								Image: "lorel/docker-stress-ng",
 								Name:  name + "-container",
 								Args: []string{
-									"-c", noOfCores,
+									"--cpu", noOfCores,
+									"--cpu-load", strconv.Itoa(load),
 									"-t", timeout,
 								},
 								Resources: k8sApi.ResourceRequirements{
 									Limits: k8sApi.ResourceList{
-										k8sApi.ResourceCPU: resource.MustParse(fmt.Sprintf("%vm", millicores)),
+										k8sApi.ResourceCPU: resource.MustParse(fmt.Sprintf("%vm", load*millicoreFactor)),
+									},
+									Requests: k8sApi.ResourceList{
+										k8sApi.ResourceCPU: resource.MustParse(fmt.Sprintf("%vm", load*millicoreFactor)),
 									},
 								},
 							},

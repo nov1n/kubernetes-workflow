@@ -1,0 +1,22 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: stress
+spec:
+  restartPolicy: Always
+  containers:
+    - name: "ubuntu1"
+      image: "gcr.io/nce-dsd2015/stress:0.1.0"
+      resources:
+        limits:
+          cpu: "500m"
+      command:
+        - "stress"
+        - "-c"
+        - "1"
+        - "&"
+        - "cpulimit"
+        - "-p"
+        - "$( pidof -o $! stress )"
+        - "-l"
+        - "20"

@@ -1,0 +1,12 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: ubuntu
+spec:
+  restartPolicy: Always
+  containers:
+    - name: "ubuntu1"
+      image: "ubuntu"
+      command:
+        - "/bin/sleep"
+        - "30000000"

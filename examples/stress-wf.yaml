@@ -1,0 +1,150 @@
+apiVersion: "nerdalize.com/v1alpha1"
+kind: "Workflow"
+metadata:
+  name: "test-workflow"
+spec:
+  activeDeadlineSeconds: 3600
+  steps:
+    step-a:
+      jobTemplate:
+        metadata:
+          name: "job1"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod1"
+              annotations:
+                scheduler.alpha.kubernetes.io/name: heat-scheduler
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  name: "ubuntu1"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"
+    step-b:
+      dependencies:
+        - "step-a"
+      jobTemplate:
+        metadata:
+          name: "job2"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod2"
+              annotations:
+                scheduler.alpha.kubernetes.io/name: heat-scheduler
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  name: "ubuntu2"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"
+    step-c:
+      dependencies:
+        - "step-b"
+      jobTemplate:
+        metadata:
+          name: "job3"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod3"
+              annotations:
+                scheduler.alpha.kubernetes.io/name: heat-scheduler
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  name: "ubuntu3"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"
+    step-d:
+      dependencies:
+        - "step-b"
+      jobTemplate:
+        metadata:
+          name: "job4"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod4"
+              annotations:
+                scheduler.alpha.kubernetes.io/name: heat-scheduler
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  name: "ubuntu4"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"
+    step-e:
+      dependencies:
+        - "step-c"
+        - "step-d"
+      jobTemplate:
+        metadata:
+          name: "job5"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod5"
+              annotations:
+                scheduler.alpha.kubernetes.io/name: heat-scheduler
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  name: "ubuntu5"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"
+    step-f:
+      dependencies:
+        - "step-e"
+      jobTemplate:
+        metadata:
+          name: "job6"
+        spec:
+          parallelism: 1
+          template:
+            metadata:
+              name: "pod6"
+              annotations:
+                scheduler.alpha.kubernetes.io/name: heat-scheduler
+            spec:
+              restartPolicy: "OnFailure"
+              containers:
+                -
+                  name: "ubuntu6"
+                  image: "jess/stress"
+                  args:
+                    - "-c"
+                    - "1"
+                    - -t
+                    - "20"

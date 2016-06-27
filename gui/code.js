@@ -100,7 +100,9 @@ function createGraph(url) {
         elements: nodesAndEdgesFromData(data),
         layout: {
           name: 'dagre',
-          fit: true
+          fit: true,
+          rankSep: 1250,
+          edgeSep: 25
         }
       });
       updateGraph(url, cy);
