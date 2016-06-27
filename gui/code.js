@@ -68,10 +68,10 @@ function updateGraph(url, cy){
         $.each(data.status.statuses, function(step, status) {
           if(status.complete === true) {
             cy.$('#' + step).addClass('completed')
-            cy.$('edge[source="' + step + '"]').addClass('completed')
+//            cy.$('edge[source="' + step + '"]').addClass('completed')
           } else {
             cy.$('#' + step).addClass('running')
-            cy.$('edge[source="' + step + '"]').addClass('running')
+//            cy.$('edge[source="' + step + '"]').addClass('running')
           }
         });
       }
@@ -101,8 +101,8 @@ function createGraph(url) {
         layout: {
           name: 'dagre',
           fit: true,
-          rankSep: 1250,
-          edgeSep: 25
+ //         rankSep: 1250,
+//          edgeSep: 25
         }
       });
       updateGraph(url, cy);

@@ -90,11 +90,10 @@ spec:
                   name: "ubuntu4"
                   command:
                     - "/bin/sleep"
-                    - "40"
+                    - "20"
     step-e:
       dependencies:
-        - "step-c"
-        - "step-d"
+        - "step-b"
       jobTemplate:
         metadata:
           name: "job5"
@@ -116,6 +115,8 @@ spec:
                     - "20"
     step-f:
       dependencies:
+        - "step-c"
+        - "step-d"
         - "step-e"
       jobTemplate:
         metadata:

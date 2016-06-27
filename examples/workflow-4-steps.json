@@ -142,8 +142,7 @@
       },
       "step-e": {
         "dependencies": [
-          "step-c",
-          "step-d"
+          "step-b"
         ],
         "jobTemplate": {
           "metadata": {
@@ -177,6 +176,8 @@
       },
       "step-f": {
         "dependencies": [
+          "step-c",
+          "step-d",
           "step-e"
         ],
         "jobTemplate": {
